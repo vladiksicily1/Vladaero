@@ -143,5 +143,6 @@ echo ""
 echo "6. Syncing web portal to FTP (vladinc.ru/vlados)..."
 python3 "$REPO_DIR/scripts/upload_ftp.py" "$WEB_INDEX" || true
 
-echo "7. Uploading release ISO to GitHub Releases..."
-gh release upload v1.0.0 "$OUTPUT_ISO" --clobber || true
+echo "7. Uploading release ISO to GitHub Releases (vladiksicily1/vlados)..."
+GITHUB_TOKEN="${VLADOS_GH_TOKEN:-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}" \
+    gh release upload v1.0.0 "$OUTPUT_ISO" "$OUTPUT_IMG" --repo vladiksicily1/vlados --clobber || true
