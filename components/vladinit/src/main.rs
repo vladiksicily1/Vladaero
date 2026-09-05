@@ -8,6 +8,27 @@ const SYS_ARG_SLICE: usize = 0x0100_0000;
 const SYS_WRITE: usize = SYS_CLASS_FILE | SYS_ARG_SLICE | 4;
 const SYS_YIELD: usize = 158;
 
+const SYS_NANOSLEEP: usize = 162;
+
+#[repr(C)]
+struct TimeSpec {
+    tv_sec: i64,
+    tv_nsec: i32,
+}
+
+#[inline(always)]
+unsafe fn sys_nanosleep(req: &TimeSpec) {
+    core::arch::asm!(
+        "syscall",
+        in("rax") SYS_NANOSLEEP,
+        in("rdi") req as *const _ as usize,
+        in("rsi") 0,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+}
+
 #[inline(always)]
 unsafe fn sys_write(fd: usize, data: &[u8]) -> usize {
     let ret: usize;
@@ -48,15 +69,29 @@ fn println(s: &str) {
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    // vladinit.vex (PID 1) holds master control over system startup
+    // 1. Maintain bootscreen while initializing core system services
+    let sleep_req = TimeSpec {
+        tv_sec: 2,
+        tv_nsec: 500_000_000, // 2.5 seconds of bootscreen animation
+    };
+    unsafe {
+        sys_nanosleep(&sleep_req);
+    }
+
+    // 2. Transition from quiet bootscreen to interactive console
+    print("\x1b[2J\x1b[H");
+
     println("=================================================");
     println("   VladOS System Supervisor: vladinit.vex");
-    println("   Architecture: x86_64 | Ring 3 Userspace");
+    println("   Architecture: x86_64 | Ring 3 Userspace (PID 1)");
     println("   Filesystem: VladFS (/VladOS/System32/)");
     println("=================================================");
-    println("[vladinit.vex] Loading system configuration (system.ini)...");
-    println("[vladinit.vex] Initializing hardware abstraction & drivers...");
-    println("[vladinit.vex] System supervisor operational.");
-    println("[vladinit.vex] Launching VladOS Command Shell (/VladOS/System32/cmd.vex)...");
+    println("[vladinit] Full control transferred from kernel to vladinit.vex.");
+    println("[vladinit] Loading system configuration (/VladOS/System32/config/system.ini)...");
+    println("[vladinit] Storage subsystem active: VladFS mounted on C:\\");
+    println("[vladinit] Spawning shell: /VladOS/System32/cmd.vex...");
+    println("-------------------------------------------------");
     println("");
     println("VladOS [Version 10.0.22000.1]");
     println("(c) 2026 Vlad Corporation. All rights reserved.");
