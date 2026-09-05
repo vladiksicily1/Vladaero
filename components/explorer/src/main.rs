@@ -61,6 +61,33 @@ unsafe fn sys_yield() {
     );
 }
 
+const SYS_VLADOS_MOUSE: usize = 0x564D;
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct MouseData {
+    x: i32,
+    y: i32,
+    buttons: u32,
+    seq: u32,
+}
+
+#[inline(always)]
+unsafe fn sys_get_mouse(out: &mut MouseData) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_MOUSE => ret,
+        in("rdi") out as *mut MouseData as usize,
+        in("rsi") 0,
+        in("rdx") 0,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
 // GUI Drawing Engine (Direct Framebuffer GOP rendering)
 struct Gfx {
     fb: *mut u32,
@@ -376,38 +403,140 @@ impl Gfx {
         // Dark Terminal Client Area
         self.fill_rect(wx + 2, wy + 33, ww - 4, wh - 35, 0x0C0C0C);
     }
+}
 
-    fn draw_cursor(&self, mx: usize, my: usize) {
-        const CURSOR_MASK: [u16; 19] = [
-            0b1000_0000_0000_0000,
-            0b1100_0000_0000_0000,
-            0b1110_0000_0000_0000,
-            0b1111_0000_0000_0000,
-            0b1111_1000_0000_0000,
-            0b1111_1100_0000_0000,
-            0b1111_1110_0000_0000,
-            0b1111_1111_0000_0000,
-            0b1111_1111_1000_0000,
-            0b1111_1111_1100_0000,
-            0b1111_1100_0000_0000,
-            0b1101_1100_0000_0000,
-            0b1000_1110_0000_0000,
-            0b0000_1110_0000_0000,
-            0b0000_0111_0000_0000,
-            0b0000_0111_0000_0000,
-            0b0000_0011_1000_0000,
-            0b0000_0011_1000_0000,
-            0b0000_0001_0000_0000,
-        ];
-        for row in 0..19 {
-            let y = my + row;
-            if y >= self.height { break; }
-            let mask = CURSOR_MASK[row];
-            for col in 0..16 {
-                let x = mx + col;
-                if x >= self.width { break; }
-                if (mask & (1 << (15 - col))) != 0 {
-                    self.put_pixel(x, y, 0xFFFFFF);
+// Authentic Windows 10 Aero Cursor (16x22)
+// Sharp aerodynamic arrow with 1px dark border, pure white fill, and soft alpha drop shadow
+const CURSOR_W: usize = 16;
+const CURSOR_H: usize = 22;
+const BG_BUF_SIZE: usize = 28;
+
+static WIN10_CURSOR: [&str; CURSOR_H] = [
+    "X               ",
+    "XX              ",
+    "X.X             ",
+    "X..X            ",
+    "X...X           ",
+    "X....X          ",
+    "X.....X         ",
+    "X......X        ",
+    "X.......X       ",
+    "X........X      ",
+    "X.........X     ",
+    "X..........X    ",
+    "X......XXXXX    ",
+    "X...X..X        ",
+    "X..X X..X       ",
+    "X.X  X..X       ",
+    "XX    X..X      ",
+    "X     X..X      ",
+    "       X..X     ",
+    "       X..X     ",
+    "        XX      ",
+    "                ",
+];
+
+struct CursorManager {
+    x: usize,
+    y: usize,
+    saved_bg: [u32; BG_BUF_SIZE * BG_BUF_SIZE],
+    saved_x: usize,
+    saved_y: usize,
+    has_saved: bool,
+}
+
+impl CursorManager {
+    fn new(init_x: usize, init_y: usize) -> Self {
+        CursorManager {
+            x: init_x,
+            y: init_y,
+            saved_bg: [0; BG_BUF_SIZE * BG_BUF_SIZE],
+            saved_x: 0,
+            saved_y: 0,
+            has_saved: false,
+        }
+    }
+
+    fn hide(&mut self, gfx: &Gfx) {
+        if self.has_saved {
+            for row in 0..BG_BUF_SIZE {
+                let py = self.saved_y + row;
+                if py >= gfx.height { break; }
+                for col in 0..BG_BUF_SIZE {
+                    let px = self.saved_x + col;
+                    if px >= gfx.width { break; }
+                    let color = self.saved_bg[row * BG_BUF_SIZE + col];
+                    gfx.put_pixel(px, py, color);
+                }
+            }
+            self.has_saved = false;
+        }
+    }
+
+    fn show(&mut self, gfx: &Gfx) {
+        self.draw_at(gfx, self.x, self.y);
+    }
+
+    fn move_to(&mut self, gfx: &Gfx, new_x: usize, new_y: usize) {
+        let new_x = new_x.min(gfx.width.saturating_sub(CURSOR_W + 4));
+        let new_y = new_y.min(gfx.height.saturating_sub(CURSOR_H + 4));
+        if self.has_saved && self.x == new_x && self.y == new_y {
+            return;
+        }
+        self.hide(gfx);
+        self.draw_at(gfx, new_x, new_y);
+    }
+
+    fn draw_at(&mut self, gfx: &Gfx, mx: usize, my: usize) {
+        self.x = mx;
+        self.y = my;
+        self.saved_x = mx;
+        self.saved_y = my;
+
+        // 1. Save underlying background rectangle
+        for row in 0..BG_BUF_SIZE {
+            let py = my + row;
+            for col in 0..BG_BUF_SIZE {
+                let px = mx + col;
+                if px < gfx.width && py < gfx.height {
+                    let color = unsafe { *gfx.fb.add(py * gfx.stride + px) };
+                    self.saved_bg[row * BG_BUF_SIZE + col] = color;
+                } else {
+                    self.saved_bg[row * BG_BUF_SIZE + col] = 0;
+                }
+            }
+        }
+        self.has_saved = true;
+
+        // 2. Draw Windows 10 Soft Drop Shadow (multi-level alpha blending)
+        for (cy, row_str) in WIN10_CURSOR.iter().enumerate() {
+            for (cx, ch) in row_str.chars().enumerate() {
+                if ch == 'X' || ch == '.' {
+                    let shadow_offsets = [(2, 2, 55), (2, 3, 35), (3, 2, 35), (3, 3, 20)];
+                    for &(so_x, so_y, dark_pct) in &shadow_offsets {
+                        let sx = mx + cx + so_x;
+                        let sy = my + cy + so_y;
+                        if sx < gfx.width && sy < gfx.height {
+                            let curr = unsafe { *gfx.fb.add(sy * gfx.stride + sx) };
+                            let r = ((curr >> 16) & 0xFF) * (100 - dark_pct) / 100;
+                            let g = ((curr >> 8) & 0xFF) * (100 - dark_pct) / 100;
+                            let b = (curr & 0xFF) * (100 - dark_pct) / 100;
+                            gfx.put_pixel(sx, sy, (r << 16) | (g << 8) | b);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Draw Windows 10 Crisp Aero Arrow
+        for (cy, row_str) in WIN10_CURSOR.iter().enumerate() {
+            for (cx, ch) in row_str.chars().enumerate() {
+                let px = mx + cx;
+                let py = my + cy;
+                if ch == 'X' {
+                    gfx.put_pixel(px, py, 0x0A0A0A);
+                } else if ch == '.' {
+                    gfx.put_pixel(px, py, 0xFFFFFF);
                 }
             }
         }
@@ -527,6 +656,7 @@ impl TerminalState {
                 self.add_line("ECHO       Displays messages.");
                 self.add_line("EXPLORER   Refreshes the Windows 10 Desktop shell.");
                 self.add_line("HELP       Provides Help information for VladOS commands.");
+                self.add_line("MOUSE      Moves or clicks Windows 10 mouse (e.g. MOUSE 20 780).");
                 self.add_line("START      Toggles the Windows 10 Start Menu.");
                 self.add_line("SYSINFO    Displays machine and operating system info.");
                 self.add_line("VER        Displays VladOS version.");
@@ -541,6 +671,7 @@ impl TerminalState {
                 self.add_line("Architecture:              x86_64 Long Mode (64-bit)");
                 self.add_line("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
                 self.add_line("Start Menu:                Active (Pinned: CMD, SysInfo, Explorer)");
+                self.add_line("Mouse Subsystem:           PS/2 Active (Windows 10 Aero Cursor with Shadow)");
                 self.add_line("Display:                   1280x800x32 Linear GOP Framebuffer");
                 self.add_line("Root Filesystem:           VladFS (Volume: VLADOS_SYS)");
                 self.add_line("Cloud Portal:              https://vladinc.ru/vlados/");
@@ -575,7 +706,6 @@ impl TerminalState {
                 if *start_menu_open {
                     gfx.draw_start_menu();
                 }
-                gfx.draw_cursor(400, 240);
                 self.add_line("[Desktop shell redrawn]");
             } else if starts_with_ignore_case(cmd, "echo ") {
                 let mut echo_buf = [0u8; 128];
@@ -589,6 +719,123 @@ impl TerminalState {
             }
         }
         self.input_len = 0;
+    }
+}
+
+fn handle_mouse_click(
+    gfx: &Gfx,
+    term: &mut TerminalState,
+    start_menu_open: &mut bool,
+    window_open: &mut bool,
+    mx: usize,
+    my: usize,
+) {
+    let tb_y = gfx.height.saturating_sub(40);
+
+    // 1. Taskbar Start Button (x: 0..48, y: 760..800)
+    if my >= tb_y && mx < 48 {
+        *start_menu_open = !*start_menu_open;
+        if *start_menu_open {
+            gfx.draw_start_menu();
+            term.add_line("[Mouse Click: Start Menu opened]");
+        } else {
+            let sm_h = 440;
+            let sm_y = tb_y.saturating_sub(sm_h);
+            gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
+            term.add_line("[Mouse Click: Start Menu closed]");
+        }
+        gfx.draw_taskbar(*start_menu_open);
+        if *window_open {
+            term.render(gfx);
+        }
+        return;
+    }
+
+    // 2. Taskbar App Icon (>_ CMD) (x: 180..220, y: 760..800)
+    if my >= tb_y && mx >= 180 && mx <= 220 {
+        *window_open = !*window_open;
+        if *window_open {
+            gfx.draw_cmd_window();
+            term.add_line("[Mouse Click: CMD window restored]");
+            term.render(gfx);
+        } else {
+            let wx = 356;
+            let wy = 48;
+            let ww = gfx.width.saturating_sub(wx + 20);
+            let wh = gfx.height.saturating_sub(wy + 56);
+            gfx.redraw_wallpaper_rect(wx, wy, ww, wh);
+            term.add_line("[Mouse Click: CMD window minimized]");
+        }
+        return;
+    }
+
+    // 3. Window Titlebar Close Button [ X ] (x: wx+ww-45..wx+ww, y: wy..wy+32)
+    let wx = 356;
+    let wy = 48;
+    let ww = gfx.width.saturating_sub(wx + 20);
+    let wh = gfx.height.saturating_sub(wy + 56);
+    if *window_open && my >= wy && my <= wy + 32 {
+        let close_start = wx + ww.saturating_sub(45);
+        if mx >= close_start && mx <= wx + ww {
+            *window_open = false;
+            gfx.redraw_wallpaper_rect(wx, wy, ww, wh);
+            term.add_line("[Mouse Click: CMD window closed]");
+            return;
+        }
+    }
+
+    // 4. Start Menu Pinned Tiles (if open)
+    if *start_menu_open {
+        let sm_h = 440;
+        let sm_y = tb_y.saturating_sub(sm_h);
+        if mx < 340 && my >= sm_y && my < tb_y {
+            // Tile 1: CMD
+            if mx >= 48 && mx <= 148 && my >= sm_y + 110 && my <= sm_y + 160 {
+                if !*window_open {
+                    *window_open = true;
+                    gfx.draw_cmd_window();
+                }
+                term.add_line("[Mouse Click: CMD Tile activated]");
+                term.render(gfx);
+            }
+            // Tile 2: SysInfo
+            else if mx >= 152 && mx <= 252 && my >= sm_y + 110 && my <= sm_y + 160 {
+                if !*window_open {
+                    *window_open = true;
+                    gfx.draw_cmd_window();
+                }
+                term.add_line("C:\\VladOS\\System32> sysinfo");
+                term.add_line("Host Name:                 VLADOS-PC");
+                term.add_line("OS Name:                   VladOS 10 Professional");
+                term.add_line("Architecture:              x86_64 Long Mode (64-bit)");
+                term.add_line("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
+                term.add_line("Mouse Subsystem:           PS/2 Active (Windows 10 Aero Cursor)");
+                term.add_line("Display:                   1280x800x32 Linear GOP Framebuffer");
+                term.render(gfx);
+            }
+            // Tile 3: Files
+            else if mx >= 48 && mx <= 148 && my >= sm_y + 168 && my <= sm_y + 218 {
+                if !*window_open {
+                    *window_open = true;
+                    gfx.draw_cmd_window();
+                }
+                term.add_line("C:\\VladOS\\System32> dir");
+                term.add_line(" Volume in drive C is VLADOS_SYS");
+                term.add_line("09/05/2026  01:00 PM             1,350 vladinit.vex");
+                term.add_line("09/05/2026  01:00 PM             2,840 explorer.vex");
+                term.add_line("09/05/2026  01:00 PM             2,180 cmd.vex");
+                term.render(gfx);
+            }
+            // Tile 4: Storage C:
+            else if mx >= 152 && mx <= 252 && my >= sm_y + 168 && my <= sm_y + 218 {
+                if !*window_open {
+                    *window_open = true;
+                    gfx.draw_cmd_window();
+                }
+                term.add_line("Storage C: [VladFS 32MB - 24MB Free]");
+                term.render(gfx);
+            }
+        }
     }
 }
 
@@ -619,6 +866,7 @@ const TAB_COMMANDS: &[&str] = &[
     "explorer",
     "help",
     "menu",
+    "mouse",
     "start",
     "sysinfo",
     "type",
@@ -631,31 +879,87 @@ pub extern "C" fn _start() -> ! {
 
     // 1. Draw Full Authentic Windows 10 GUI Desktop
     gfx.draw_desktop();
+    let mut window_open = true;
     gfx.draw_cmd_window();
     let mut start_menu_open = true;
     gfx.draw_taskbar(start_menu_open);
     gfx.draw_start_menu();
-    gfx.draw_cursor(400, 240);
 
     let mut term = TerminalState::new();
     term.render(&gfx);
 
+    // 2. Initialize Windows 10 Aero Cursor Manager
+    let mut cursor = CursorManager::new(450, 260);
+    cursor.show(&gfx);
+
+    let mut last_mouse_seq = 0u32;
+    let mut last_buttons = 0u32;
     let mut read_buf = [0u8; 16];
 
     loop {
+        // 3. Poll Hardware PS/2 Mouse Subsystem via SYS_VLADOS_MOUSE
+        let mut mouse = MouseData::default();
+        let seq = unsafe { sys_get_mouse(&mut mouse) } as u32;
+        if seq != 0 && seq != last_mouse_seq {
+            last_mouse_seq = seq;
+            cursor.move_to(&gfx, mouse.x as usize, mouse.y as usize);
+
+            // Detect Left Button Click
+            if (mouse.buttons & 1) != 0 && (last_buttons & 1) == 0 {
+                cursor.hide(&gfx);
+                handle_mouse_click(
+                    &gfx,
+                    &mut term,
+                    &mut start_menu_open,
+                    &mut window_open,
+                    mouse.x as usize,
+                    mouse.y as usize,
+                );
+                cursor.show(&gfx);
+            }
+            last_buttons = mouse.buttons;
+        }
+
+        // 4. Poll Keyboard Input
         let n = unsafe { sys_read(0, &mut read_buf) };
         if n > 0 && n <= read_buf.len() {
             for i in 0..n {
                 let b = read_buf[i];
 
                 if b == b'\r' || b == b'\n' {
-                    term.execute_command(&gfx, &mut start_menu_open);
-                    term.render(&gfx);
+                    // Check if command is mouse simulation: "mouse x y" or "click"
+                    if starts_with_ignore_case(core::str::from_utf8(&term.input_buf[..term.input_len]).unwrap_or(""), "mouse ") {
+                        let cmd_str = core::str::from_utf8(&term.input_buf[..term.input_len]).unwrap_or("");
+                        let mut parts = cmd_str[6..].trim().split_ascii_whitespace();
+                        if let (Some(xs), Some(ys)) = (parts.next(), parts.next()) {
+                            if let (Ok(x), Ok(y)) = (xs.parse::<usize>(), ys.parse::<usize>()) {
+                                cursor.move_to(&gfx, x, y);
+                                cursor.hide(&gfx);
+                                handle_mouse_click(&gfx, &mut term, &mut start_menu_open, &mut window_open, x, y);
+                                cursor.show(&gfx);
+                            }
+                        }
+                        term.input_len = 0;
+                        if window_open {
+                            term.render(&gfx);
+                        }
+                    } else {
+                        cursor.hide(&gfx);
+                        term.execute_command(&gfx, &mut start_menu_open);
+                        if window_open {
+                            term.render(&gfx);
+                        }
+                        cursor.show(&gfx);
+                    }
                 } else if b == 0x08 || b == 0x7F {
                     // Backspace
                     if term.input_len > 0 {
                         term.input_len -= 1;
-                        term.render(&gfx);
+                        if window_open {
+                            cursor.hide(&gfx);
+                            term.render(&gfx);
+                            cursor.show(&gfx);
+                        }
                     }
                 } else if b == 0x09 {
                     // Tab auto-completion
@@ -674,7 +978,11 @@ pub extern "C" fn _start() -> ! {
                                         term.input_buf[term.input_len] = b' ';
                                         term.input_len += 1;
                                     }
-                                    term.render(&gfx);
+                                    if window_open {
+                                        cursor.hide(&gfx);
+                                        term.render(&gfx);
+                                        cursor.show(&gfx);
+                                    }
                                     break;
                                 }
                             }
@@ -684,9 +992,14 @@ pub extern "C" fn _start() -> ! {
                     // Ctrl+C
                     term.input_len = 0;
                     term.add_line("^C");
-                    term.render(&gfx);
+                    if window_open {
+                        cursor.hide(&gfx);
+                        term.render(&gfx);
+                        cursor.show(&gfx);
+                    }
                 } else if b == 0x1B {
                     // Escape key toggles Start Menu!
+                    cursor.hide(&gfx);
                     start_menu_open = !start_menu_open;
                     if start_menu_open {
                         gfx.draw_start_menu();
@@ -697,13 +1010,20 @@ pub extern "C" fn _start() -> ! {
                         gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
                     }
                     gfx.draw_taskbar(start_menu_open);
-                    term.render(&gfx);
+                    if window_open {
+                        term.render(&gfx);
+                    }
+                    cursor.show(&gfx);
                 } else if b >= 32 && b <= 126 {
                     // Printable ASCII character
                     if term.input_len + 1 < term.input_buf.len() {
                         term.input_buf[term.input_len] = b;
                         term.input_len += 1;
-                        term.render(&gfx);
+                        if window_open {
+                            cursor.hide(&gfx);
+                            term.render(&gfx);
+                            cursor.show(&gfx);
+                        }
                     }
                 }
             }
