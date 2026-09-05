@@ -28,14 +28,14 @@ if [ ! -f "$MKFS_VLADFS" ]; then
     cargo build --manifest-path "$REPO_DIR/components/vladfs/Cargo.toml" --release
 fi
 
-echo "1. Building VladOS System Supervisor (vladinit.vex) and Shell (cmd.vex)..."
-RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/vladinit/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
-    cargo build --manifest-path "$REPO_DIR/components/vladinit/Cargo.toml" --target x86_64-unknown-none --release
-VLADINIT_BIN="$REPO_DIR/components/vladinit/target/x86_64-unknown-none/release/vladinit_bin"
-
+echo "1. Building VladOS Shell (cmd.vex) and System Supervisor (vladinit.vex)..."
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/cmd/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/cmd/Cargo.toml" --target x86_64-unknown-none --release
 CMD_BIN="$REPO_DIR/components/cmd/target/x86_64-unknown-none/release/cmd_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/vladinit/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/vladinit/Cargo.toml" --target x86_64-unknown-none --release
+VLADINIT_BIN="$REPO_DIR/components/vladinit/target/x86_64-unknown-none/release/vladinit_bin"
 
 echo "2. Preparing VladOS system root ($SYSROOT_DIR)..."
 mkdir -p "$SYSROOT_DIR/VladOS/System32/config"

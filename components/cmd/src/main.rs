@@ -168,37 +168,51 @@ pub extern "C" fn _start() -> ! {
     println("VladOS [Version 10.0.22000.1]");
     println("(c) 2026 Vlad Corporation. All rights reserved.");
     println("");
-
-    // Simulate startup auto-test in interactive shell
-    print_prompt();
-    println("ver");
-    handle_command("ver");
-
-    println("");
-    print_prompt();
-    println("sysinfo");
-    handle_command("sysinfo");
-
-    println("");
-    print_prompt();
-    println("dir");
-    handle_command("dir");
-
-    println("");
     print_prompt();
 
-    // Read interactive commands from stdin if available
-    let mut buf = [0u8; 64];
+    let mut line_buf = [0u8; 128];
+    let mut line_len: usize = 0;
+    let mut read_buf = [0u8; 16];
+
     loop {
-        let n = unsafe { sys_read(0, &mut buf) };
-        if n > 0 && n < buf.len() {
-            if let Ok(s) = core::str::from_utf8(&buf[..n]) {
-                handle_command(s);
-                print_prompt();
+        let n = unsafe { sys_read(0, &mut read_buf) };
+        if n > 0 && n <= read_buf.len() {
+            for i in 0..n {
+                let b = read_buf[i];
+                if b == b'\r' || b == b'\n' {
+                    println("");
+                    if line_len > 0 {
+                        if let Ok(cmd_str) = core::str::from_utf8(&line_buf[..line_len]) {
+                            handle_command(cmd_str);
+                        }
+                        line_len = 0;
+                    }
+                    print_prompt();
+                } else if b == 0x08 || b == 0x7F {
+                    // Backspace
+                    if line_len > 0 {
+                        line_len -= 1;
+                        print("\x08");
+                    }
+                } else if b == 0x03 {
+                    // Ctrl+C
+                    println("^C");
+                    line_len = 0;
+                    print_prompt();
+                } else if b >= 32 && b <= 126 {
+                    // Printable ASCII
+                    if line_len + 1 < line_buf.len() {
+                        line_buf[line_len] = b;
+                        line_len += 1;
+                        let echo = [b];
+                        unsafe { sys_write(1, &echo) };
+                    }
+                }
             }
-        }
-        unsafe {
-            sys_yield();
+        } else {
+            unsafe {
+                sys_yield();
+            }
         }
     }
 }
