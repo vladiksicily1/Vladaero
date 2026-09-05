@@ -921,6 +921,7 @@ pub extern "C" fn _start() -> ! {
     let mut last_mouse_seq = 0u32;
     let mut last_buttons = 0u32;
     let mut read_buf = [0u8; 16];
+    let mut esc_state = 0u8; // 0 = normal, 1 = saw 0x1B, 2 = saw '['
 
     loop {
         // 3. Poll Hardware PS/2 Mouse Subsystem via SYS_VLADOS_MOUSE
@@ -952,11 +953,73 @@ pub extern "C" fn _start() -> ! {
             for i in 0..n {
                 let b = read_buf[i];
 
+                if esc_state == 1 {
+                    if b == b'[' {
+                        esc_state = 2;
+                        continue;
+                    } else {
+                        // Standalone Escape key toggles Start Menu!
+                        esc_state = 0;
+                        cursor.hide(&gfx);
+                        start_menu_open = !start_menu_open;
+                        if start_menu_open {
+                            gfx.draw_start_menu();
+                        } else {
+                            let tb_y = gfx.height.saturating_sub(40);
+                            let sm_h = 440;
+                            let sm_y = tb_y.saturating_sub(sm_h);
+                            gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
+                        }
+                        gfx.draw_taskbar(start_menu_open);
+                        if window_open {
+                            term.render(&gfx);
+                        }
+                        cursor.show(&gfx);
+                    }
+                } else if esc_state == 2 {
+                    esc_state = 0;
+                    // Arrow Keys move Windows 10 cursor smoothly (iPad / keyboard navigation)
+                    if b == b'A' {
+                        // Up
+                        cursor.move_to(&gfx, cursor.x, cursor.y.saturating_sub(24));
+                    } else if b == b'B' {
+                        // Down
+                        cursor.move_to(&gfx, cursor.x, (cursor.y + 24).min(gfx.height - 1));
+                    } else if b == b'C' {
+                        // Right
+                        cursor.move_to(&gfx, (cursor.x + 24).min(gfx.width - 1), cursor.y);
+                    } else if b == b'D' {
+                        // Left
+                        cursor.move_to(&gfx, cursor.x.saturating_sub(24), cursor.y);
+                    }
+                    continue;
+                }
+
+                if b == 0x1B {
+                    esc_state = 1;
+                    continue;
+                }
+
                 if b == b'\r' || b == b'\n' {
-                    // Check if command is mouse simulation: "mouse x y" or "click"
-                    if starts_with_ignore_case(core::str::from_utf8(&term.input_buf[..term.input_len]).unwrap_or(""), "mouse ") {
-                        let cmd_str = core::str::from_utf8(&term.input_buf[..term.input_len]).unwrap_or("");
-                        let mut parts = cmd_str[6..].trim().split_ascii_whitespace();
+                    if term.input_len == 0 {
+                        // Empty Enter triggers a click at current cursor position!
+                        cursor.hide(&gfx);
+                        handle_mouse_click(&gfx, &mut term, &mut start_menu_open, &mut window_open, cursor.x, cursor.y);
+                        if window_open {
+                            term.render(&gfx);
+                        }
+                        cursor.show(&gfx);
+                        continue;
+                    }
+
+                    // Check if command is mouse simulation: "mouse x y", "click x y", or "tap x y"
+                    let curr_cmd = core::str::from_utf8(&term.input_buf[..term.input_len]).unwrap_or("");
+                    if starts_with_ignore_case(curr_cmd, "mouse ")
+                        || starts_with_ignore_case(curr_cmd, "click ")
+                        || starts_with_ignore_case(curr_cmd, "tap ")
+                    {
+                        let split_at = if starts_with_ignore_case(curr_cmd, "mouse ") { 6 } else { 5 };
+                        let mut parts = curr_cmd[split_at..].trim().split_ascii_whitespace();
                         if let (Some(xs), Some(ys)) = (parts.next(), parts.next()) {
                             if let (Ok(x), Ok(y)) = (xs.parse::<usize>(), ys.parse::<usize>()) {
                                 cursor.move_to(&gfx, x, y);
@@ -1023,24 +1086,22 @@ pub extern "C" fn _start() -> ! {
                         term.render(&gfx);
                         cursor.show(&gfx);
                     }
-                } else if b == 0x1B {
-                    // Escape key toggles Start Menu!
-                    cursor.hide(&gfx);
-                    start_menu_open = !start_menu_open;
-                    if start_menu_open {
-                        gfx.draw_start_menu();
-                    } else {
-                        let tb_y = gfx.height.saturating_sub(40);
-                        let sm_h = 440;
-                        let sm_y = tb_y.saturating_sub(sm_h);
-                        gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
-                    }
-                    gfx.draw_taskbar(start_menu_open);
-                    if window_open {
-                        term.render(&gfx);
-                    }
-                    cursor.show(&gfx);
                 } else if b >= 32 && b <= 126 {
+                    // Quick numeric shortcut when buffer is empty:
+                    // 1 = CMD, 2 = SysInfo, 3 = Files, 4 = Storage
+                    if term.input_len == 0 && (b >= b'1' && b <= b'4') {
+                        let target_x = if b == b'1' || b == b'3' { 98 } else { 202 };
+                        let target_y = if b == b'1' || b == b'2' { gfx.height.saturating_sub(440) + 130 } else { gfx.height.saturating_sub(440) + 190 };
+                        cursor.move_to(&gfx, target_x, target_y);
+                        cursor.hide(&gfx);
+                        handle_mouse_click(&gfx, &mut term, &mut start_menu_open, &mut window_open, target_x, target_y);
+                        if window_open {
+                            term.render(&gfx);
+                        }
+                        cursor.show(&gfx);
+                        continue;
+                    }
+
                     // Printable ASCII character
                     if term.input_len + 1 < term.input_buf.len() {
                         term.input_buf[term.input_len] = b;

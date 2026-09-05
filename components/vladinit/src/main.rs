@@ -72,8 +72,8 @@ pub extern "C" fn _start() -> ! {
     // vladinit.vex (PID 1) holds master control over system startup
     // 1. Maintain bootscreen while initializing core system services
     let sleep_req = TimeSpec {
-        tv_sec: 2,
-        tv_nsec: 500_000_000, // 2.5 seconds of bootscreen animation
+        tv_sec: 0,
+        tv_nsec: 400_000_000, // 0.4s fast bootscreen display
     };
     unsafe {
         sys_nanosleep(&sleep_req);
