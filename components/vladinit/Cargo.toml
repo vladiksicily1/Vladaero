@@ -1,0 +1,17 @@
+[package]
+name = "vladinit"
+version = "1.0.0"
+edition = "2021"
+description = "VladOS Ring 3 System Supervisor (.vex binary)"
+
+[[bin]]
+name = "vladinit_bin"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = true
+codegen-units = 1

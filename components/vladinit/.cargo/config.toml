@@ -1,0 +1,10 @@
+[build]
+target = "x86_64-unknown-none"
+
+[target.x86_64-unknown-none]
+rustflags = [
+    "-C", "relocation-model=static",
+    "-C", "link-arg=--image-base=0x1000",
+    "-C", "link-arg=-T/workspaces/Vladaero/vlados/components/vladinit/link.ld",
+    "-C", "link-arg=-z", "-C", "link-arg=max-page-size=0x1000",
+]

@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VladOS — Операционная система нового поколения в стиле Windows 10</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --win-blue: #0078D7;
+            --win-blue-hover: #106EBE;
+            --win-dark: #121212;
+            --win-card: #1E1E1E;
+            --win-card-border: rgba(255, 255, 255, 0.1);
+            --win-text: #FFFFFF;
+            --win-subtext: #A0A0A0;
+            --win-accent: #2B88D8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--win-dark);
+            color: var(--win-text);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--win-card-border);
+            backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(18, 18, 18, 0.85);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .win-tiles {
+            display: grid;
+            grid-template-columns: 14px 14px;
+            grid-gap: 3px;
+        }
+
+        .win-tile {
+            width: 14px;
+            height: 14px;
+            background-color: var(--win-blue);
+        }
+
+        .brand-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--win-subtext);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+        }
+
+        .btn-auth-nav {
+            background-color: transparent;
+            border: 1px solid var(--win-blue);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-auth-nav:hover {
+            background-color: var(--win-blue);
+        }
+
+        .hero {
+            max-width: 1200px;
+            margin: 60px auto;
+            padding: 0 30px;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-text h1 {
+            font-size: 3.2rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 20px;
+        }
+
+        .hero-text h1 span {
+            color: var(--win-blue);
+        }
+
+        .hero-text p {
+            font-size: 1.2rem;
+            color: var(--win-subtext);
+            margin-bottom: 35px;
+        }
+
+        .download-group {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background-color: var(--win-blue);
+            color: #fff;
+            padding: 14px 28px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 120, 215, 0.3);
+            transition: all 0.2s;
+        }
+
+        .btn-download:hover {
+            background-color: var(--win-blue-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 120, 215, 0.45);
+        }
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background-color: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 4px;
+            border: 1px solid var(--win-card-border);
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Screen Preview Card */
+        .preview-card {
+            background: var(--win-card);
+            border: 1px solid var(--win-card-border);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .preview-header {
+            background: #252525;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--win-card-border);
+        }
+
+        .window-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #555;
+        }
+
+        .preview-content {
+            background: #000;
+            padding: 60px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 320px;
+        }
+
+        .preview-tiles {
+            display: grid;
+            grid-template-columns: 24px 24px;
+            grid-gap: 4px;
+            margin-bottom: 20px;
+        }
+
+        .preview-tile {
+            width: 24px;
+            height: 24px;
+            background-color: var(--win-blue);
+        }
+
+        .preview-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .preview-spinner {
+            width: 40px;
+            height: 40px;
+            position: relative;
+            animation: spin 1.2s infinite linear;
+            margin-bottom: 20px;
+        }
+
+        .spinner-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .d1 { top: 0; left: 17px; }
+        .d2 { top: 5px; right: 5px; }
+        .d3 { top: 17px; right: 0; }
+        .d4 { bottom: 5px; right: 5px; }
+        .d5 { bottom: 0; left: 17px; }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .preview-sub {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        /* Account Section */
+        .account-section {
+            background: #181818;
+            border-top: 1px solid var(--win-card-border);
+            border-bottom: 1px solid var(--win-card-border);
+            padding: 80px 20px;
+        }
+
+        .account-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            background: var(--win-card);
+            padding: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--win-card-border);
+        }
+
+        .account-info h2 {
+            font-size: 2rem;
+            margin-bottom: 16px;
+        }
+
+        .account-info p {
+            color: var(--win-subtext);
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        .badge-optional {
+            display: inline-block;
+            background: rgba(0, 120, 215, 0.15);
+            color: var(--win-accent);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            border: 1px solid rgba(0, 120, 215, 0.3);
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #DDD;
+            font-size: 0.95rem;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            color: var(--win-blue);
+            font-weight: bold;
+        }
+
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.9rem;
+            color: var(--win-subtext);
+        }
+
+        .form-group input {
+            background: #282828;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 12px 14px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--win-blue);
+        }
+
+        .btn-submit {
+            background: var(--win-blue);
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+
+        .btn-submit:hover {
+            background: var(--win-blue-hover);
+        }
+
+        .auth-toggle {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--win-subtext);
+            margin-top: 8px;
+        }
+
+        .auth-toggle a {
+            color: var(--win-accent);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Architecture Grid */
+        .features-section {
+            max-width: 1200px;
+            margin: 80px auto;
+            padding: 0 30px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .section-header h2 {
+            font-size: 2.4rem;
+            margin-bottom: 12px;
+        }
+
+        .section-header p {
+            color: var(--win-subtext);
+            font-size: 1.1rem;
+        }
+
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background: var(--win-card);
+            border: 1px solid var(--win-card-border);
+            border-radius: 8px;
+            padding: 30px;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 16px;
+            color: var(--win-blue);
+        }
+
+        .card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        .card p {
+            color: var(--win-subtext);
+            font-size: 0.95rem;
+        }
+
+        footer {
+            margin-top: auto;
+            border-top: 1px solid var(--win-card-border);
+            padding: 30px 40px;
+            text-align: center;
+            color: var(--win-subtext);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 850px) {
+            .hero {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .download-group {
+                justify-content: center;
+            }
+            .account-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="#" class="logo-container">
+            <div class="win-tiles">
+                <div class="win-tile"></div>
+                <div class="win-tile"></div>
+                <div class="win-tile"></div>
+                <div class="win-tile"></div>
+            </div>
+            <span class="brand-title">VladOS 10</span>
+        </a>
+        <nav class="nav-links">
+            <a href="#features">Архитектура</a>
+            <a href="#downloads">Скачать</a>
+            <a href="#account">Аккаунт</a>
+            <button class="btn-auth-nav" onclick="document.getElementById('account').scrollIntoView({behavior: 'smooth'})">Войти</button>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="hero-text">
+            <h1>Операционная система <span>VladOS 10</span></h1>
+            <p>Быстрое 64-битное гибридное ядро, нативная файловая система VladFS и знакомый графический интерфейс в эстетике Windows 10.</p>
+            <div class="download-group" id="downloads">
+                <a href="vlados.iso" class="btn-download" download>
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                    Скачать VladOS (ISO)
+                </a>
+                <a href="vlados.img" class="btn-secondary" download>
+                    Скачать образ диска (.IMG)
+                </a>
+            </div>
+        </div>
+
+        <div class="preview-card">
+            <div class="preview-header">
+                <div class="window-dot"></div>
+                <div class="window-dot"></div>
+                <div class="window-dot"></div>
+                <span style="font-size: 0.8rem; color: #888; margin-left: 8px;">VladOS UEFI Bootloader</span>
+            </div>
+            <div class="preview-content">
+                <div class="preview-tiles">
+                    <div class="preview-tile"></div>
+                    <div class="preview-tile"></div>
+                    <div class="preview-tile"></div>
+                    <div class="preview-tile"></div>
+                </div>
+                <div class="preview-title">VladOS</div>
+                <div class="preview-spinner">
+                    <div class="spinner-dot d1"></div>
+                    <div class="spinner-dot d2"></div>
+                    <div class="spinner-dot d3"></div>
+                    <div class="spinner-dot d4"></div>
+                    <div class="spinner-dot d5"></div>
+                </div>
+                <div class="preview-sub">Starting system...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Account Portal Section -->
+    <section class="account-section" id="account">
+        <div class="account-container">
+            <div class="account-info">
+                <span class="badge-optional">Опциональный вход</span>
+                <h2>Учетная запись VladOS</h2>
+                <p>Вход в ОС с онлайн-аккаунтом позволяет синхронизировать персонализацию, настройки рабочего стола и конфигурации между устройствами.</p>
+                <ul class="feature-list">
+                    <li>Вход опционален: можно войти локально без пароля и интернета</li>
+                    <li>Синхронизация профиля и истории приложений</li>
+                    <li>Доступ к репозиторию пакетов и облачным сервисам VladInc</li>
+                    <li>Управление устройствами и безопасность</li>
+                </ul>
+            </div>
+
+            <div class="account-card">
+                <form class="auth-form" id="authForm" onsubmit="handleAuth(event)">
+                    <h3 id="formTitle" style="font-size: 1.3rem; margin-bottom: 10px;">Вход в аккаунт</h3>
+                    <div class="form-group">
+                        <label for="username">Имя пользователя / Email</label>
+                        <input type="text" id="username" placeholder="vlad@vladinc.ru" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Пароль</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-submit" id="btnSubmit">Войти в аккаунт</button>
+                    <div class="auth-toggle">
+                        <span id="toggleText">Еще нет аккаунта?</span>
+                        <a onclick="toggleMode()" id="toggleLink">Зарегистрироваться</a>
+                    </div>
+                    <div id="authStatus" style="font-size: 0.9rem; margin-top: 10px; display: none; padding: 10px; border-radius: 4px;"></div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture & Features -->
+    <section class="features-section" id="features">
+        <div class="section-header">
+            <h2>Технологии и Архитектура</h2>
+            <p>Создано на базе принципов надежности и производительности</p>
+        </div>
+
+        <div class="grid-cards">
+            <div class="card">
+                <div class="card-icon">⚡</div>
+                <h3>Ядро VladOS x86_64</h3>
+                <p>Современное ядро на Rust с вытесняющей многозадачностью, защитой памяти через Paging и быстрым планировщиком потоков.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">📁</div>
+                <h3>Файловая система VladFS</h3>
+                <p>Структурированная файловая система с таблицей записей файлов (FRT), резидентными метаданными и мгновенным доступом к файлам.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">🪟</div>
+                <h3>Оконный менеджер (DWM)</h3>
+                <p>Аппаратная композиция окон без мерцания, плавная анимация 60 FPS, нативная поддержка мыши и оконного интерфейса.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 VladOS / VladInc Corporation. Все права защищены.</p>
+        <p style="font-size: 0.8rem; margin-top: 6px; color: #666;">Загрузка доступна на vladinc.ru/vlados и vladislavb.ru/vlados.img</p>
+    </footer>
+
+    <script>
+        let isRegister = false;
+
+        function toggleMode() {
+            isRegister = !isRegister;
+            document.getElementById('formTitle').innerText = isRegister ? "Создание аккаунта" : "Вход в аккаунт";
+            document.getElementById('btnSubmit').innerText = isRegister ? "Зарегистрироваться" : "Войти в аккаунт";
+            document.getElementById('toggleText').innerText = isRegister ? "Уже есть аккаунт?" : "Еще нет аккаунта?";
+            document.getElementById('toggleLink').innerText = isRegister ? "Войти" : "Зарегистрироваться";
+            document.getElementById('authStatus').style.display = 'none';
+        }
+
+        function handleAuth(e) {
+            e.preventDefault();
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value;
+            const statusDiv = document.getElementById('authStatus');
+
+            if (isRegister) {
+                localStorage.setItem("vlados_user_" + user, JSON.stringify({ user, pass, created: new Date().toISOString() }));
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = 'rgba(0, 200, 80, 0.15)';
+                statusDiv.style.color = '#4EFA87';
+                statusDiv.innerText = `Аккаунт ${user} успешно создан! Теперь вы можете войти в ОС под этим именем.`;
+            } else {
+                const stored = localStorage.getItem("vlados_user_" + user);
+                if (stored || user === "vlad") {
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.background = 'rgba(0, 120, 215, 0.15)';
+                    statusDiv.style.color = '#70B4FF';
+                    statusDiv.innerText = `Добро пожаловать, ${user}! Аккаунт готов для синхронизации с VladOS.`;
+                } else {
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.background = 'rgba(255, 60, 60, 0.15)';
+                    statusDiv.style.color = '#FF6B6B';
+                    statusDiv.innerText = `Пользователь не найден. Нажмите «Зарегистрироваться».`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
