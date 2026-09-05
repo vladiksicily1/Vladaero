@@ -69,7 +69,10 @@ const COMMANDS: &[&str] = &[
     "dir",
     "echo",
     "exit",
+    "explorer",
     "help",
+    "menu",
+    "start",
     "sysinfo",
     "type",
     "ver",
@@ -80,6 +83,7 @@ const FILES: &[&str] = &[
     "cmd.vex",
     "config",
     "drivers",
+    "explorer.vex",
     "system.ini",
     "vladinit.vex",
 ];
@@ -99,8 +103,10 @@ fn handle_command(cmd: &str) {
         println("CLS        Clears the screen.");
         println("DIR        Displays a list of files and subdirectories in a directory.");
         println("ECHO       Displays messages, or turns command echoing on or off.");
-        println("EXIT       Quits the CMD.VEX program (command interpreter).");
+        println("EXIT       Quits CMD.VEX and returns to Windows 10 Start Menu.");
+        println("EXPLORER   Launches Windows 10 Desktop Shell / Start Menu.");
         println("HELP       Provides Help information for VladOS commands.");
+        println("START      Opens the Windows 10 Start Menu (explorer.vex).");
         println("SYSINFO    Displays VladOS machine and OS configuration.");
         println("TYPE       Displays the contents of a text file.");
         println("VER        Displays the VladOS version.");
@@ -113,6 +119,8 @@ fn handle_command(cmd: &str) {
         println("OS Name:                   VladOS 10 Professional");
         println("OS Version:                1.0.0 Build 2026.09.05");
         println("OS Architecture:           x86_64 Long Mode (64-bit)");
+        println("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
+        println("Start Menu:                Active (Pinned: CMD, SysInfo, Explorer)");
         println("Executable Standard:       .vex (Vlad EXecutable)");
         println("Root Filesystem:           VladFS (Volume: VLADOS_SYS)");
         println("Display:                   1280x800x32 Linear GOP Framebuffer");
@@ -129,8 +137,9 @@ fn handle_command(cmd: &str) {
         println("09/05/2026  01:00 PM    <DIR>          config");
         println("09/05/2026  01:00 PM    <DIR>          drivers");
         println("09/05/2026  01:00 PM             1,350 vladinit.vex");
+        println("09/05/2026  01:00 PM             2,840 explorer.vex");
         println("09/05/2026  01:00 PM             2,180 cmd.vex");
-        println("               2 File(s)          3,530 bytes");
+        println("               3 File(s)          6,370 bytes");
         println("               4 Dir(s)      24,117,248 bytes free");
     } else if starts_with_ignore_case(cmd, "echo ") {
         println(&cmd[5..]);
@@ -143,7 +152,8 @@ fn handle_command(cmd: &str) {
             println("Version=1.0.0");
             println("Architecture=x86_64");
             println("Init=/VladOS/System32/vladinit.vex");
-            println("Shell=/VladOS/System32/cmd.vex");
+            println("Shell=/VladOS/System32/explorer.vex");
+            println("Terminal=/VladOS/System32/cmd.vex");
             println("Theme=FluentDark");
         } else if file.ends_with("account.cfg") {
             println("; VladOS Account Settings");
@@ -154,8 +164,10 @@ fn handle_command(cmd: &str) {
             print("The system cannot find the file specified: ");
             println(file);
         }
-    } else if eq_ignore_ascii_case(cmd, "exit") {
-        println("Exiting VladOS Command Interpreter...");
+    } else if eq_ignore_ascii_case(cmd, "exit") || eq_ignore_ascii_case(cmd, "explorer") || eq_ignore_ascii_case(cmd, "start") || eq_ignore_ascii_case(cmd, "menu") {
+        println("Returning to Windows 10 Start Menu (explorer.vex)...");
+        let explorer_entry: extern "C" fn() -> ! = unsafe { core::mem::transmute(0x100000usize) };
+        explorer_entry();
     } else {
         print("'");
         print(cmd);

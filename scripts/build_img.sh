@@ -28,10 +28,14 @@ if [ ! -f "$MKFS_VLADFS" ]; then
     cargo build --manifest-path "$REPO_DIR/components/vladfs/Cargo.toml" --release
 fi
 
-echo "1. Building VladOS Shell (cmd.vex) and System Supervisor (vladinit.vex)..."
+echo "1. Building VladOS Binaries (cmd.vex, explorer.vex, and vladinit.vex)..."
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/cmd/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/cmd/Cargo.toml" --target x86_64-unknown-none --release
 CMD_BIN="$REPO_DIR/components/cmd/target/x86_64-unknown-none/release/cmd_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/explorer/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/explorer/Cargo.toml" --target x86_64-unknown-none --release
+EXPLORER_BIN="$REPO_DIR/components/explorer/target/x86_64-unknown-none/release/explorer_bin"
 
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/vladinit/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/vladinit/Cargo.toml" --target x86_64-unknown-none --release
@@ -45,9 +49,11 @@ mkdir -p "$SYSROOT_DIR/Users/Default"
 mkdir -p "$SYSROOT_DIR/Users/Vlad"
 mkdir -p "$SYSROOT_DIR/Programs"
 
-# Install vladinit.vex and cmd.vex into /VladOS/System32/
+# Install vladinit.vex, explorer.vex, and cmd.vex into /VladOS/System32/
 cp "$VLADINIT_BIN" "$SYSROOT_DIR/VladOS/System32/vladinit.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/vladinit.vex"
+cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/explorer.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/explorer.vex"
 cp "$CMD_BIN" "$SYSROOT_DIR/VladOS/System32/cmd.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/cmd.vex"
 
@@ -60,7 +66,8 @@ Architecture=x86_64
 BuildDate=2026-09-05
 Kernel=kernel.elf
 Init=/VladOS/System32/vladinit.vex
-Shell=/VladOS/System32/cmd.vex
+Shell=/VladOS/System32/explorer.vex
+Terminal=/VladOS/System32/cmd.vex
 LogonUI=enabled
 AccountPortal=https://vladinc.ru/vlados
 
