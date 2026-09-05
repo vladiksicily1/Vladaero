@@ -88,6 +88,24 @@ unsafe fn sys_get_mouse(out: &mut MouseData) -> usize {
     ret
 }
 
+const SYS_VLADOS_DISPLAY: usize = 0x5644;
+
+#[inline(always)]
+unsafe fn sys_get_display_dims(dims: &mut [u32; 4]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_DISPLAY => ret,
+        in("rdi") dims.as_mut_ptr() as usize,
+        in("rsi") 0,
+        in("rdx") 0,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
 // GUI Drawing Engine (Direct Framebuffer GOP rendering)
 struct Gfx {
     fb: *mut u32,
@@ -98,11 +116,19 @@ struct Gfx {
 
 impl Gfx {
     fn new() -> Self {
+        let mut dims = [0u32; 4];
+        unsafe {
+            sys_get_display_dims(&mut dims);
+        }
+        let width = if dims[0] > 0 { dims[0] as usize } else { 800 };
+        let height = if dims[1] > 0 { dims[1] as usize } else { 600 };
+        let stride = if dims[2] > 0 { dims[2] as usize } else { width };
+
         Gfx {
             fb: FB_BASE as *mut u32,
-            width: SCREEN_WIDTH,
-            height: SCREEN_HEIGHT,
-            stride: STRIDE,
+            width,
+            height,
+            stride,
         }
     }
 
@@ -370,10 +396,10 @@ impl Gfx {
     }
 
     fn draw_cmd_window(&self) {
-        let wx = 356;
-        let wy = 48;
-        let ww = self.width.saturating_sub(wx + 20);
-        let wh = self.height.saturating_sub(wy + 56);
+        let wx = if self.width >= 1024 { 356 } else { 16 };
+        let wy = 36;
+        let ww = self.width.saturating_sub(wx + 16);
+        let wh = self.height.saturating_sub(wy + 48);
 
         // Windows 10 Active Blue Border
         self.draw_rect_outline(wx, wy, ww, wh, 0x0078D7);
@@ -587,12 +613,12 @@ impl TerminalState {
     }
 
     fn render(&self, gfx: &Gfx) {
-        let wx = 356;
-        let wy = 48;
+        let wx = if gfx.width >= 1024 { 356 } else { 16 };
+        let wy = 36;
         let vx = wx + 8;
         let vy = wy + 40;
-        let ww = gfx.width.saturating_sub(wx + 20);
-        let wh = gfx.height.saturating_sub(wy + 56);
+        let ww = gfx.width.saturating_sub(wx + 16);
+        let wh = gfx.height.saturating_sub(wy + 48);
 
         // Clear terminal area
         gfx.fill_rect(wx + 2, wy + 33, ww - 4, wh - 35, 0x0C0C0C);
@@ -759,10 +785,10 @@ fn handle_mouse_click(
             term.add_line("[Mouse Click: CMD window restored]");
             term.render(gfx);
         } else {
-            let wx = 356;
-            let wy = 48;
-            let ww = gfx.width.saturating_sub(wx + 20);
-            let wh = gfx.height.saturating_sub(wy + 56);
+            let wx = if gfx.width >= 1024 { 356 } else { 16 };
+            let wy = 36;
+            let ww = gfx.width.saturating_sub(wx + 16);
+            let wh = gfx.height.saturating_sub(wy + 48);
             gfx.redraw_wallpaper_rect(wx, wy, ww, wh);
             term.add_line("[Mouse Click: CMD window minimized]");
         }
@@ -770,10 +796,10 @@ fn handle_mouse_click(
     }
 
     // 3. Window Titlebar Close Button [ X ] (x: wx+ww-45..wx+ww, y: wy..wy+32)
-    let wx = 356;
-    let wy = 48;
-    let ww = gfx.width.saturating_sub(wx + 20);
-    let wh = gfx.height.saturating_sub(wy + 56);
+    let wx = if gfx.width >= 1024 { 356 } else { 16 };
+    let wy = 36;
+    let ww = gfx.width.saturating_sub(wx + 16);
+    let wh = gfx.height.saturating_sub(wy + 48);
     if *window_open && my >= wy && my <= wy + 32 {
         let close_start = wx + ww.saturating_sub(45);
         if mx >= close_start && mx <= wx + ww {
