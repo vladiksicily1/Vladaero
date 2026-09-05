@@ -64,6 +64,26 @@ fn println(s: &str) {
     print("\n");
 }
 
+const COMMANDS: &[&str] = &[
+    "cls",
+    "dir",
+    "echo",
+    "exit",
+    "help",
+    "sysinfo",
+    "type",
+    "ver",
+];
+
+const FILES: &[&str] = &[
+    "account.cfg",
+    "cmd.vex",
+    "config",
+    "drivers",
+    "system.ini",
+    "vladinit.vex",
+];
+
 fn print_prompt() {
     print("C:\\VladOS\\System32> ");
 }
@@ -193,6 +213,55 @@ pub extern "C" fn _start() -> ! {
                     if line_len > 0 {
                         line_len -= 1;
                         print("\x08");
+                    }
+                } else if b == 0x09 {
+                    // Tab auto-completion
+                    if line_len > 0 {
+                        if let Ok(curr) = core::str::from_utf8(&line_buf[..line_len]) {
+                            if let Some(space_pos) = curr.rfind(' ') {
+                                let prefix = &curr[space_pos + 1..];
+                                if !prefix.is_empty() {
+                                    for &f in FILES {
+                                        if starts_with_ignore_case(f, prefix) {
+                                            for _ in 0..prefix.len() {
+                                                print("\x08");
+                                            }
+                                            line_len = space_pos + 1;
+                                            for byte in f.bytes() {
+                                                if line_len < line_buf.len() {
+                                                    line_buf[line_len] = byte;
+                                                    line_len += 1;
+                                                }
+                                            }
+                                            print(f);
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else {
+                                for &c in COMMANDS {
+                                    if starts_with_ignore_case(c, curr) {
+                                        for _ in 0..line_len {
+                                            print("\x08");
+                                        }
+                                        line_len = 0;
+                                        for byte in c.bytes() {
+                                            if line_len < line_buf.len() {
+                                                line_buf[line_len] = byte;
+                                                line_len += 1;
+                                            }
+                                        }
+                                        if line_len < line_buf.len() {
+                                            line_buf[line_len] = b' ';
+                                            line_len += 1;
+                                        }
+                                        print(c);
+                                        print(" ");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else if b == 0x03 {
                     // Ctrl+C
