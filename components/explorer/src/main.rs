@@ -102,6 +102,28 @@ unsafe fn sys_yield() {
     );
 }
 
+const SYS_VLADOS_VFS_READ: usize = 0x5646;
+
+#[inline(always)]
+unsafe fn sys_vfs_read(path: &str, buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_READ => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") buf.as_mut_ptr() as usize,
+        in("r10") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+static mut ACTIVE_FONT: [u8; 16384] = [0u8; 16384];
+static mut FONT_LOADED_FROM_VFS: bool = false;
+
 const SYS_VLADOS_MOUSE: usize = 0x564D;
 
 #[repr(C)]
@@ -223,7 +245,7 @@ impl Gfx {
                 let dst_ptr = unsafe { self.fb.add(py * self.stride + x) };
                 let row_offset = font_offset + row * 8;
                 for col in 0..8 {
-                    let a = cascadia_font::FONT_AA[row_offset + col] as u32;
+                    let a = unsafe { ACTIVE_FONT[row_offset + col] as u32 };
                     if a > 0 {
                         let r = ((cr * a) + (br * (255 - a))) / 255;
                         let g = ((cg * a) + (bg * (255 - a))) / 255;
@@ -734,13 +756,19 @@ impl TerminalState {
             } else if eq_ignore_ascii_case(cmd, "sysinfo") {
                 self.add_line("Host Name:                 VLADOS-PC");
                 self.add_line("OS Name:                   VladOS 10 Professional");
-                self.add_line("OS Version:                1.0.0 Build 2026.09.05");
+                self.add_line("OS Version:                1.0.0 Build 2026.09.06");
                 self.add_line("Architecture:              x86_64 Long Mode (64-bit)");
                 self.add_line("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
                 self.add_line("Start Menu:                Active (Pinned: CMD, SysInfo, Explorer)");
-                self.add_line("Mouse Subsystem:           PS/2 Active (Windows 10 Aero Cursor with Shadow)");
+                self.add_line("Mouse Subsystem:           USB Tablet / PS/2 Active (Windows 10 Aero)");
                 self.add_line("Display:                   1280x800x32 Linear GOP Framebuffer");
                 self.add_line("Root Filesystem:           VladFS (Volume: VLADOS_SYS)");
+                let font_source = if unsafe { FONT_LOADED_FROM_VFS } {
+                    "Font Subsystem:            VladFS (/VladOS/Resources/Fonts/CascadiaMono.fnt)"
+                } else {
+                    "Font Subsystem:            Builtin Embedded Fallback"
+                };
+                self.add_line(font_source);
                 self.add_line("Cloud Portal:              https://vladinc.ru/vlados/");
             } else if eq_ignore_ascii_case(cmd, "dir") {
                 self.add_line(" Volume in drive C is VLADOS_SYS");
@@ -876,8 +904,14 @@ fn handle_mouse_click(
                 term.add_line("OS Name:                   VladOS 10 Professional");
                 term.add_line("Architecture:              x86_64 Long Mode (64-bit)");
                 term.add_line("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
-                term.add_line("Mouse Subsystem:           PS/2 Active (Windows 10 Aero Cursor)");
+                term.add_line("Mouse Subsystem:           USB Tablet / PS/2 Active (Windows 10 Aero)");
                 term.add_line("Display:                   1280x800x32 Linear GOP Framebuffer");
+                let font_source = if unsafe { FONT_LOADED_FROM_VFS } {
+                    "Font Subsystem:            VladFS (/VladOS/Resources/Fonts/CascadiaMono.fnt)"
+                } else {
+                    "Font Subsystem:            Builtin Embedded Fallback"
+                };
+                term.add_line(font_source);
                 term.render(gfx);
             }
             // Tile 3: Files
@@ -942,6 +976,16 @@ const TAB_COMMANDS: &[&str] = &[
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    // 0. Load Font from VladFS filesystem (/VladOS/Resources/Fonts/CascadiaMono.fnt)
+    unsafe {
+        let n = sys_vfs_read("/VladOS/Resources/Fonts/CascadiaMono.fnt", &mut ACTIVE_FONT);
+        if n == 16384 {
+            FONT_LOADED_FROM_VFS = true;
+        } else {
+            ACTIVE_FONT.copy_from_slice(&cascadia_font::FONT_AA);
+        }
+    }
+
     let gfx = Gfx::new();
 
     // 1. Draw Full Authentic Windows 10 GUI Desktop

@@ -53,6 +53,43 @@ unsafe fn sys_yield() {
     );
 }
 
+const SYS_VLADOS_VFS_READ: usize = 0x5646;
+const SYS_VLADOS_VFS_LIST: usize = 0x564C;
+
+#[inline(always)]
+unsafe fn sys_vfs_read(path: &str, buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_READ => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") buf.as_mut_ptr() as usize,
+        in("r10") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_list(path: &str, buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_LIST => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") buf.as_mut_ptr() as usize,
+        in("r10") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
 fn print(s: &str) {
     unsafe {
         sys_write(1, s.as_bytes());
@@ -126,43 +163,78 @@ fn handle_command(cmd: &str) {
         println("Display:                   1280x800x32 Linear GOP Framebuffer");
         println("Theme Engine:              Windows 10 Fluent Dark");
         println("Cloud Portal:              https://vladinc.ru/vlados/");
-    } else if eq_ignore_ascii_case(cmd, "dir") {
+    } else if eq_ignore_ascii_case(cmd, "dir") || starts_with_ignore_case(cmd, "dir ") {
+        let dir_target = if starts_with_ignore_case(cmd, "dir ") {
+            cmd[4..].trim()
+        } else {
+            "/VladOS/System32"
+        };
+        let normalized = if dir_target.starts_with("C:") || dir_target.starts_with("c:") {
+            &dir_target[2..]
+        } else {
+            dir_target
+        };
+        let lookup_path = if normalized.is_empty() { "/" } else { normalized };
+
         println(" Volume in drive C is VLADOS_SYS");
         println(" Volume Serial Number is 564C-4144");
+        print(" Directory of C:");
+        println(lookup_path);
         println("");
-        println(" Directory of C:\\VladOS\\System32");
-        println("");
-        println("09/05/2026  01:00 PM    <DIR>          .");
-        println("09/05/2026  01:00 PM    <DIR>          ..");
-        println("09/05/2026  01:00 PM    <DIR>          config");
-        println("09/05/2026  01:00 PM    <DIR>          drivers");
-        println("09/05/2026  01:00 PM             1,350 vladinit.vex");
-        println("09/05/2026  01:00 PM             2,840 explorer.vex");
-        println("09/05/2026  01:00 PM             2,180 cmd.vex");
-        println("               3 File(s)          6,370 bytes");
-        println("               4 Dir(s)      24,117,248 bytes free");
+
+        static mut DIR_BUF: [u8; 4096] = [0u8; 4096];
+        let n = unsafe { sys_vfs_list(lookup_path, &mut DIR_BUF) };
+        if n > 0 && n <= 4096 {
+            if let Ok(s) = core::str::from_utf8(unsafe { &DIR_BUF[..n] }) {
+                print(s);
+            }
+        } else {
+            println("09/06/2026  01:00 PM    <DIR>          config");
+            println("09/06/2026  01:00 PM    <DIR>          drivers");
+            println("09/06/2026  01:00 PM             1,350 vladinit.vex");
+            println("09/06/2026  01:00 PM             2,840 explorer.vex");
+            println("09/06/2026  01:00 PM             2,180 cmd.vex");
+        }
     } else if starts_with_ignore_case(cmd, "echo ") {
         println(&cmd[5..]);
     } else if starts_with_ignore_case(cmd, "type ") {
         let file = cmd[5..].trim();
-        if file.ends_with("system.ini") {
-            println("; VladOS Configuration");
-            println("[System]");
-            println("OSName=VladOS");
-            println("Version=1.0.0");
-            println("Architecture=x86_64");
-            println("Init=/VladOS/System32/vladinit.vex");
-            println("Shell=/VladOS/System32/explorer.vex");
-            println("Terminal=/VladOS/System32/cmd.vex");
-            println("Theme=FluentDark");
-        } else if file.ends_with("account.cfg") {
-            println("; VladOS Account Settings");
-            println("[Account]");
-            println("DefaultUser=Vlad");
-            println("AuthURL=https://vladinc.ru/vlados/api/auth");
+        let normalized = if file.starts_with("C:") || file.starts_with("c:") {
+            &file[2..]
         } else {
-            print("The system cannot find the file specified: ");
-            println(file);
+            file
+        };
+
+        static mut FILE_BUF: [u8; 8192] = [0u8; 8192];
+        let n = unsafe { sys_vfs_read(normalized, &mut FILE_BUF) };
+        if n > 0 && n <= 8192 {
+            if let Ok(s) = core::str::from_utf8(unsafe { &FILE_BUF[..n] }) {
+                println(s);
+            } else {
+                println("[Binary Resource File]");
+            }
+        } else {
+            // Also try with /VladOS/System32/ prefix
+            let mut pref_buf = [0u8; 128];
+            let prefix = b"/VladOS/System32/";
+            pref_buf[..prefix.len()].copy_from_slice(prefix);
+            let name_bytes = normalized.trim_start_matches('/').as_bytes();
+            let total = (prefix.len() + name_bytes.len()).min(128);
+            pref_buf[prefix.len()..total].copy_from_slice(&name_bytes[..total - prefix.len()]);
+            let mut found = false;
+            if let Ok(full_path) = core::str::from_utf8(&pref_buf[..total]) {
+                let n2 = unsafe { sys_vfs_read(full_path, &mut FILE_BUF) };
+                if n2 > 0 && n2 <= 8192 {
+                    if let Ok(s) = core::str::from_utf8(unsafe { &FILE_BUF[..n2] }) {
+                        println(s);
+                        found = true;
+                    }
+                }
+            }
+            if !found {
+                print("The system cannot find the file specified: ");
+                println(file);
+            }
         }
     } else if eq_ignore_ascii_case(cmd, "exit") || eq_ignore_ascii_case(cmd, "explorer") || eq_ignore_ascii_case(cmd, "start") || eq_ignore_ascii_case(cmd, "menu") {
         println("Returning to Windows 10 Start Menu (explorer.vex)...");
