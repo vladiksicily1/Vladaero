@@ -28,7 +28,7 @@ if [ ! -f "$MKFS_VLADFS" ]; then
     cargo build --manifest-path "$REPO_DIR/components/vladfs/Cargo.toml" --release
 fi
 
-echo "1. Building VladOS Binaries (cmd, explorer, vladinit, notepad, and calc)..."
+echo "1. Building VladOS Binaries (cmd, explorer, vladinit, notepad, calc, diskutil, pathedit)..."
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/cmd/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/cmd/Cargo.toml" --target x86_64-unknown-none --release
 CMD_BIN="$REPO_DIR/components/cmd/target/x86_64-unknown-none/release/cmd_bin"
@@ -48,6 +48,14 @@ NOTEPAD_BIN="$REPO_DIR/components/notepad/target/x86_64-unknown-none/release/not
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/calc/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/calc/Cargo.toml" --target x86_64-unknown-none --release
 CALC_BIN="$REPO_DIR/components/calc/target/x86_64-unknown-none/release/calc_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/diskutil/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/diskutil/Cargo.toml" --target x86_64-unknown-none --release
+DISKUTIL_BIN="$REPO_DIR/components/diskutil/target/x86_64-unknown-none/release/diskutil_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/pathedit/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/pathedit/Cargo.toml" --target x86_64-unknown-none --release
+PATHEDIT_BIN="$REPO_DIR/components/pathedit/target/x86_64-unknown-none/release/pathedit_bin"
 
 echo "2. Preparing VladOS system root ($SYSROOT_DIR)..."
 mkdir -p "$SYSROOT_DIR/VladOS/System32/config"
@@ -75,12 +83,33 @@ cp "$NOTEPAD_BIN" "$SYSROOT_DIR/VladOS/System32/notepad.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/notepad.vex"
 cp "$CALC_BIN" "$SYSROOT_DIR/VladOS/System32/calc.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/calc.vex"
+cp "$DISKUTIL_BIN" "$SYSROOT_DIR/VladOS/System32/diskutil.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/diskutil.vex"
+cp "$PATHEDIT_BIN" "$SYSROOT_DIR/VladOS/System32/pathedit.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/pathedit.vex"
 cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/player.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/player.vex"
 cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/photos.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/photos.vex"
 
+mkdir -p "$SYSROOT_DIR/VladOS/System32/Config"
+cat << 'EOF' > "$SYSROOT_DIR/VladOS/System32/Config/path.cfg"
+C:\VladOS\System32
+EOF
+
 # Desktop Shortcuts (.lnk)
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Disk Management.lnk"
+[Shortcut]
+Target=/VladOS/System32/diskutil.vex
+Icon=diskutil
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Environment PATH.lnk"
+[Shortcut]
+Target=/VladOS/System32/pathedit.vex
+Icon=pathedit
+EOF
+
 cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Command Prompt.lnk"
 [Shortcut]
 Target=/VladOS/System32/cmd.vex

@@ -1140,6 +1140,74 @@ pub struct DragState {
     pub is_resize: bool,
 }
 
+pub struct DiskManagementState {
+    pub open: bool,
+    pub x: usize,
+    pub y: usize,
+    pub w: usize,
+    pub h: usize,
+    pub is_maximized: bool,
+    pub restore_x: usize,
+    pub restore_y: usize,
+    pub restore_w: usize,
+    pub restore_h: usize,
+    pub selected_vol: usize,
+    pub selected_disk: usize,
+}
+
+impl DiskManagementState {
+    pub fn new() -> Self {
+        Self {
+            open: false,
+            x: 200,
+            y: 70,
+            w: 780,
+            h: 490,
+            is_maximized: false,
+            restore_x: 200,
+            restore_y: 70,
+            restore_w: 780,
+            restore_h: 490,
+            selected_vol: 0,
+            selected_disk: 0,
+        }
+    }
+}
+
+pub struct PathEditorState {
+    pub open: bool,
+    pub x: usize,
+    pub y: usize,
+    pub w: usize,
+    pub h: usize,
+    pub is_maximized: bool,
+    pub restore_x: usize,
+    pub restore_y: usize,
+    pub restore_w: usize,
+    pub restore_h: usize,
+    pub selected_idx: usize,
+    pub status_text: &'static str,
+}
+
+impl PathEditorState {
+    pub fn new() -> Self {
+        Self {
+            open: false,
+            x: 260,
+            y: 90,
+            w: 680,
+            h: 450,
+            is_maximized: false,
+            restore_x: 260,
+            restore_y: 90,
+            restore_w: 680,
+            restore_h: 450,
+            selected_idx: 0,
+            status_text: r"System PATH active. Default: C:\VladOS\System32",
+        }
+    }
+}
+
 pub struct DesktopState {
     pub start_menu_open: bool,
     pub cmd_open: bool,
@@ -1158,9 +1226,11 @@ pub struct DesktopState {
     pub calc: CalculatorState,
     pub iv: ImageViewerState,
     pub mp: MediaPlayerState,
+    pub du: DiskManagementState,
+    pub pe: PathEditorState,
 
-    pub focus: usize, // 0: CMD, 1: Explorer, 2: Notepad, 3: Calculator, 4: ImageViewer, 5: MediaPlayer
-    pub z_order: [usize; 6],
+    pub focus: usize, // 0: CMD, 1: Explorer, 2: Notepad, 3: Calc, 4: IV, 5: MP, 6: DiskUtil, 7: PathEdit
+    pub z_order: [usize; 8],
 
     pub drag: Option<DragState>,
 
@@ -1197,9 +1267,17 @@ impl DesktopState {
             calc: CalculatorState::new(),
             iv: ImageViewerState::new(),
             mp: MediaPlayerState::new(),
+            du: DiskManagementState {
+                open: true,
+                ..DiskManagementState::new()
+            },
+            pe: PathEditorState {
+                open: true,
+                ..PathEditorState::new()
+            },
 
-            focus: 1,
-            z_order: [0, 3, 5, 4, 2, 1],
+            focus: 6,
+            z_order: [0, 3, 5, 4, 2, 1, 7, 6],
 
             drag: None,
 
@@ -1236,6 +1314,8 @@ impl DesktopState {
             3 => self.calc.open,
             4 => self.iv.open,
             5 => self.mp.open,
+            6 => self.du.open,
+            7 => self.pe.open,
             _ => false,
         }
     }
@@ -1248,6 +1328,8 @@ impl DesktopState {
             3 => self.calc.open = open,
             4 => self.iv.open = open,
             5 => self.mp.open = open,
+            6 => self.du.open = open,
+            7 => self.pe.open = open,
             _ => {}
         }
     }
@@ -1260,6 +1342,8 @@ impl DesktopState {
             3 => (self.calc.x, self.calc.y, self.calc.w, self.calc.h),
             4 => (self.iv.x, self.iv.y, self.iv.w, self.iv.h),
             5 => (self.mp.x, self.mp.y, self.mp.w, self.mp.h),
+            6 => (self.du.x, self.du.y, self.du.w, self.du.h),
+            7 => (self.pe.x, self.pe.y, self.pe.w, self.pe.h),
             _ => (0, 0, 0, 0),
         }
     }
@@ -1272,6 +1356,8 @@ impl DesktopState {
             3 => { self.calc.x = x; self.calc.y = y; },
             4 => { self.iv.x = x; self.iv.y = y; },
             5 => { self.mp.x = x; self.mp.y = y; },
+            6 => { self.du.x = x; self.du.y = y; },
+            7 => { self.pe.x = x; self.pe.y = y; },
             _ => {}
         }
     }
@@ -1284,6 +1370,8 @@ impl DesktopState {
             3 => { self.calc.w = w; self.calc.h = h; },
             4 => { self.iv.w = w; self.iv.h = h; },
             5 => { self.mp.w = w; self.mp.h = h; },
+            6 => { self.du.w = w; self.du.h = h; },
+            7 => { self.pe.w = w; self.pe.h = h; },
             _ => {}
         }
     }
@@ -1296,6 +1384,8 @@ impl DesktopState {
             3 => self.calc.is_maximized,
             4 => self.iv.is_maximized,
             5 => self.mp.is_maximized,
+            6 => self.du.is_maximized,
+            7 => self.pe.is_maximized,
             _ => false,
         }
     }
@@ -1417,6 +1507,44 @@ impl DesktopState {
                     self.mp.is_maximized = true;
                 }
             }
+            6 => {
+                if self.du.is_maximized {
+                    self.du.x = self.du.restore_x;
+                    self.du.y = self.du.restore_y;
+                    self.du.w = self.du.restore_w;
+                    self.du.h = self.du.restore_h;
+                    self.du.is_maximized = false;
+                } else {
+                    self.du.restore_x = self.du.x;
+                    self.du.restore_y = self.du.y;
+                    self.du.restore_w = self.du.w;
+                    self.du.restore_h = self.du.h;
+                    self.du.x = 0;
+                    self.du.y = 0;
+                    self.du.w = screen_w;
+                    self.du.h = work_h;
+                    self.du.is_maximized = true;
+                }
+            }
+            7 => {
+                if self.pe.is_maximized {
+                    self.pe.x = self.pe.restore_x;
+                    self.pe.y = self.pe.restore_y;
+                    self.pe.w = self.pe.restore_w;
+                    self.pe.h = self.pe.restore_h;
+                    self.pe.is_maximized = false;
+                } else {
+                    self.pe.restore_x = self.pe.x;
+                    self.pe.restore_y = self.pe.y;
+                    self.pe.restore_w = self.pe.w;
+                    self.pe.restore_h = self.pe.h;
+                    self.pe.x = 0;
+                    self.pe.y = 0;
+                    self.pe.w = screen_w;
+                    self.pe.h = work_h;
+                    self.pe.is_maximized = true;
+                }
+            }
             _ => {}
         }
     }
@@ -1504,6 +1632,32 @@ impl DesktopState {
                 self.mp.h = work_h;
                 self.mp.is_maximized = false;
             }
+            6 => {
+                if !self.du.is_maximized {
+                    self.du.restore_x = self.du.x;
+                    self.du.restore_y = self.du.y;
+                    self.du.restore_w = self.du.w;
+                    self.du.restore_h = self.du.h;
+                }
+                self.du.x = x;
+                self.du.y = 0;
+                self.du.w = half_w;
+                self.du.h = work_h;
+                self.du.is_maximized = false;
+            }
+            7 => {
+                if !self.pe.is_maximized {
+                    self.pe.restore_x = self.pe.x;
+                    self.pe.restore_y = self.pe.y;
+                    self.pe.restore_w = self.pe.w;
+                    self.pe.restore_h = self.pe.h;
+                }
+                self.pe.x = x;
+                self.pe.y = 0;
+                self.pe.w = half_w;
+                self.pe.h = work_h;
+                self.pe.is_maximized = false;
+            }
             _ => {}
         }
     }
@@ -1557,9 +1711,13 @@ unsafe fn sys_get_display_dims(dims: &mut [u32; 4]) -> usize {
     ret
 }
 
-// GUI Drawing Engine (Direct Framebuffer GOP rendering)
+// Static Backbuffer for 100% Flicker-Free Double-Buffered DWM Rendering
+static mut BACKBUFFER: [u32; SCREEN_WIDTH * SCREEN_HEIGHT] = [0u32; SCREEN_WIDTH * SCREEN_HEIGHT];
+
+// GUI Drawing Engine (Double-Buffered GOP rendering)
 struct Gfx {
     fb: *mut u32,
+    bb: *mut u32,
     width: usize,
     height: usize,
     stride: usize,
@@ -1571,12 +1729,13 @@ impl Gfx {
         unsafe {
             sys_get_display_dims(&mut dims);
         }
-        let width = if dims[0] > 0 { dims[0] as usize } else { 800 };
-        let height = if dims[1] > 0 { dims[1] as usize } else { 600 };
+        let width = if dims[0] > 0 { dims[0] as usize } else { SCREEN_WIDTH };
+        let height = if dims[1] > 0 { dims[1] as usize } else { SCREEN_HEIGHT };
         let stride = if dims[2] > 0 { dims[2] as usize } else { width };
 
         Gfx {
             fb: FB_BASE as *mut u32,
+            bb: unsafe { BACKBUFFER.as_mut_ptr() },
             width,
             height,
             stride,
@@ -1584,10 +1743,17 @@ impl Gfx {
     }
 
     #[inline(always)]
+    fn present(&self) {
+        unsafe {
+            core::ptr::copy_nonoverlapping(self.bb, self.fb, self.height * self.stride);
+        }
+    }
+
+    #[inline(always)]
     fn put_pixel(&self, x: usize, y: usize, color: u32) {
         if x < self.width && y < self.height {
             unsafe {
-                *self.fb.add(y * self.stride + x) = color;
+                *self.bb.add(y * self.stride + x) = color;
             }
         }
     }
@@ -1596,7 +1762,7 @@ impl Gfx {
         let x_end = core::cmp::min(x + w, self.width);
         let y_end = core::cmp::min(y + h, self.height);
         for row in y..y_end {
-            let row_ptr = unsafe { self.fb.add(row * self.stride) };
+            let row_ptr = unsafe { self.bb.add(row * self.stride) };
             for col in x..x_end {
                 unsafe {
                     *row_ptr.add(col) = color;
@@ -1630,7 +1796,7 @@ impl Gfx {
             let font_offset = ch_idx * 128;
             for row in 0..16 {
                 let py = y + row;
-                let dst_ptr = unsafe { self.fb.add(py * self.stride + x) };
+                let dst_ptr = unsafe { self.bb.add(py * self.stride + x) };
                 let row_offset = font_offset + row * 8;
                 for col in 0..8 {
                     let a = unsafe { ACTIVE_FONT[row_offset + col] as u32 };
@@ -1679,12 +1845,12 @@ impl Gfx {
                 let dist = dist_x.max(dist_y);
                 if dist > 0 && dist <= shadow_depth {
                     let dark_pct = 40usize.saturating_sub(dist * 5) as u32;
-                    let px = unsafe { *self.fb.add(y * self.stride + x) };
+                    let px = unsafe { *self.bb.add(y * self.stride + x) };
                     let r = ((px >> 16) & 0xFF) * (100 - dark_pct) / 100;
                     let g = ((px >> 8) & 0xFF) * (100 - dark_pct) / 100;
                     let b = (px & 0xFF) * (100 - dark_pct) / 100;
                     unsafe {
-                        *self.fb.add(y * self.stride + x) = (r << 16) | (g << 8) | b;
+                        *self.bb.add(y * self.stride + x) = (r << 16) | (g << 8) | b;
                     }
                 }
             }
@@ -1771,16 +1937,16 @@ impl Gfx {
             ("This PC", 20, 0x0078D7, false, 0),
             ("Recycle Bin", 92, 0x00B7C3, false, 1),
             ("Command Prompt", 164, 0x00B7C3, true, 2),
-            ("File Explorer", 236, 0xFFC83B, true, 3),
-            ("Notepad", 308, 0x0078D7, true, 4),
+            ("Disk Management", 236, 0x0078D7, true, 10),
+            ("File Explorer", 308, 0xFFC83B, true, 3),
         ];
 
         let col1 = [
-            ("Calculator", 20, 0x2A2A2A, true, 5),
-            ("Media Player", 92, 0x9A4D8B, true, 6),
-            ("Photos", 164, 0x50D090, true, 7),
-            ("Control Panel", 236, 0x005A9E, true, 8),
-            ("Welcome.txt", 308, 0xEAEAEA, false, 9),
+            ("Environment PATH", 20, 0x008272, true, 11),
+            ("Notepad", 92, 0x0078D7, true, 4),
+            ("Calculator", 164, 0x2A2A2A, true, 5),
+            ("Media Player", 236, 0x9A4D8B, true, 6),
+            ("Photos", 308, 0x50D090, true, 7),
         ];
 
         for &(name, y, accent, is_shortcut, icon_type) in &col0 {
@@ -1865,6 +2031,21 @@ impl Gfx {
                 self.draw_rect_outline(x + 6, y + 4, 28, 26, 0x88909D);
                 self.fill_rect(x + 14, y + 11, 12, 12, accent);
                 self.fill_rect(x + 18, y + 15, 4, 4, 0x101418);
+            }
+            10 => {
+                // Disk Management (hard drive stack)
+                self.fill_rect(x + 6, y + 4, 28, 7, 0x0078D7);
+                self.draw_rect_outline(x + 6, y + 4, 28, 7, 0x4896FF);
+                self.fill_rect(x + 6, y + 13, 28, 7, 0x0078D7);
+                self.draw_rect_outline(x + 6, y + 13, 28, 7, 0x4896FF);
+                self.fill_rect(x + 6, y + 22, 28, 7, 0x0078D7);
+                self.draw_rect_outline(x + 6, y + 22, 28, 7, 0x4896FF);
+            }
+            11 => {
+                // Environment PATH ($P badge)
+                self.fill_rect(x + 6, y + 4, 28, 26, 0x004E44);
+                self.draw_rect_outline(x + 6, y + 4, 28, 26, 0x008272);
+                self.draw_text(x + 10, y + 10, "$P", 0x00FF88, 0x004E44);
             }
             _ => {
                 // Text Document (.txt)
@@ -2259,7 +2440,7 @@ impl Gfx {
             let g = 11 + (progress * 16) / 255;
             let b = 22 + (progress * 38) / 255;
             let col = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
-            let row_ptr = unsafe { self.fb.add(row * self.stride) };
+            let row_ptr = unsafe { self.bb.add(row * self.stride) };
             for c in 0..self.width {
                 unsafe {
                     *row_ptr.add(c) = col;
@@ -2297,7 +2478,7 @@ impl Gfx {
             let g = 11 + (progress * 16) / 255;
             let b = 22 + (progress * 38) / 255;
             let col = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
-            let row_ptr = unsafe { self.fb.add(row * self.stride) };
+            let row_ptr = unsafe { self.bb.add(row * self.stride) };
             for c in rx..x_end {
                 unsafe {
                     *row_ptr.add(c) = col;
@@ -2331,76 +2512,63 @@ impl Gfx {
         self.draw_rect_outline(54, tb_y + 5, 170, 30, 0x2D333C);
         self.draw_text(64, tb_y + 12, "Search VladOS...", 0x6E7684, 0x1C2026);
 
-        // CMD Taskbar Button (232..276)
-        let cmd_active = ds.cmd_open && ds.focus == 0;
-        let cmd_bg = if cmd_active { 0x242A34 } else if ds.cmd_open { 0x1A1F26 } else { 0x101418 };
-        self.fill_rect(232, tb_y + 3, 44, 34, cmd_bg);
-        self.draw_rect_outline(232, tb_y + 3, 44, 34, 0x2D333C);
-        self.draw_text(244, tb_y + 12, ">_", 0x00B7C3, cmd_bg);
-        if ds.cmd_open {
-            let bar_col = if cmd_active { 0x0078D7 } else { 0x777777 };
-            self.fill_rect(236, self.height - 2, 36, 2, bar_col);
+        // Dynamic Taskbar: Windows 10 EnumWindows style
+        let mut open_wins = [0usize; 8];
+        let mut open_count = 0;
+        for wid in 0..8 {
+            if ds.is_open(wid) {
+                open_wins[open_count] = wid;
+                open_count += 1;
+            }
         }
 
-        // Explorer Taskbar Button (282..326)
-        let fe_active = ds.fe.open && ds.focus == 1;
-        let exp_bg = if fe_active { 0x242A34 } else if ds.fe.open { 0x1A1F26 } else { 0x101418 };
-        self.fill_rect(282, tb_y + 3, 44, 34, exp_bg);
-        self.draw_rect_outline(282, tb_y + 3, 44, 34, 0x2D333C);
-        self.fill_rect(294, tb_y + 12, 18, 14, 0xFFC83B);
-        self.fill_rect(296, tb_y + 10, 7, 2, 0xFFC83B);
-        self.fill_rect(298, tb_y + 14, 10, 8, 0x0078D7);
-        if ds.fe.open {
-            let bar_col = if fe_active { 0x0078D7 } else { 0x777777 };
-            self.fill_rect(286, self.height - 2, 36, 2, bar_col);
-        }
+        for i in 0..open_count {
+            let wid = open_wins[i];
+            let bx = 232 + i * 48;
+            let is_active = ds.focus == wid;
+            let bg_col = if is_active { 0x242A34 } else { 0x161A20 };
 
-        // Notepad Taskbar Button (332..376)
-        let np_active = ds.np.open && ds.focus == 2;
-        let np_bg = if np_active { 0x242A34 } else if ds.np.open { 0x1A1F26 } else { 0x101418 };
-        self.fill_rect(332, tb_y + 3, 44, 34, np_bg);
-        self.draw_rect_outline(332, tb_y + 3, 44, 34, 0x2D333C);
-        self.fill_rect(344, tb_y + 9, 18, 20, 0x0078D7);
-        self.draw_text(348, tb_y + 11, "N", 0xFFFFFF, 0x0078D7);
-        if ds.np.open {
-            let bar_col = if np_active { 0x0078D7 } else { 0x777777 };
-            self.fill_rect(336, self.height - 2, 36, 2, bar_col);
-        }
+            self.fill_rect(bx, tb_y + 3, 44, 34, bg_col);
+            self.draw_rect_outline(bx, tb_y + 3, 44, 34, 0x2D333C);
 
-        // Calculator Taskbar Button (382..426)
-        let calc_active = ds.calc.open && ds.focus == 3;
-        let calc_bg = if calc_active { 0x242A34 } else if ds.calc.open { 0x1A1F26 } else { 0x101418 };
-        self.fill_rect(382, tb_y + 3, 44, 34, calc_bg);
-        self.draw_rect_outline(382, tb_y + 3, 44, 34, 0x2D333C);
-        self.fill_rect(394, tb_y + 9, 18, 20, 0x2A2A2A);
-        self.draw_text(398, tb_y + 11, "#", 0x00B7C3, 0x2A2A2A);
-        if ds.calc.open {
-            let bar_col = if calc_active { 0x0078D7 } else { 0x777777 };
-            self.fill_rect(386, self.height - 2, 36, 2, bar_col);
-        }
+            match wid {
+                0 => {
+                    self.draw_text(bx + 12, tb_y + 12, ">_", 0x00B7C3, bg_col);
+                }
+                1 => {
+                    self.fill_rect(bx + 12, tb_y + 12, 18, 14, 0xFFC83B);
+                    self.fill_rect(bx + 14, tb_y + 10, 7, 2, 0xFFC83B);
+                    self.fill_rect(bx + 16, tb_y + 14, 10, 8, 0x0078D7);
+                }
+                2 => {
+                    self.fill_rect(bx + 13, tb_y + 9, 18, 20, 0x0078D7);
+                    self.draw_text(bx + 17, tb_y + 11, "N", 0xFFFFFF, 0x0078D7);
+                }
+                3 => {
+                    self.fill_rect(bx + 13, tb_y + 9, 18, 20, 0x2A2A2A);
+                    self.draw_text(bx + 17, tb_y + 11, "#", 0x00B7C3, 0x2A2A2A);
+                }
+                4 => {
+                    self.fill_rect(bx + 13, tb_y + 9, 18, 20, 0x50D090);
+                    self.draw_text(bx + 17, tb_y + 11, "P", 0x101010, 0x50D090);
+                }
+                5 => {
+                    self.fill_rect(bx + 13, tb_y + 9, 18, 20, 0x9A4D8B);
+                    self.draw_text(bx + 17, tb_y + 11, "M", 0xFFFFFF, 0x9A4D8B);
+                }
+                6 => {
+                    self.fill_rect(bx + 13, tb_y + 9, 18, 20, 0x0078D7);
+                    self.draw_text(bx + 17, tb_y + 11, "D", 0xFFFFFF, 0x0078D7);
+                }
+                7 => {
+                    self.fill_rect(bx + 13, tb_y + 9, 18, 20, 0x008272);
+                    self.draw_text(bx + 17, tb_y + 11, "$", 0xFFFFFF, 0x008272);
+                }
+                _ => {}
+            }
 
-        // Media Player Taskbar Button (432..476)
-        let mp_active = ds.mp.open && ds.focus == 5;
-        let mp_bg = if mp_active { 0x242A34 } else if ds.mp.open { 0x1A1F26 } else { 0x101418 };
-        self.fill_rect(432, tb_y + 3, 44, 34, mp_bg);
-        self.draw_rect_outline(432, tb_y + 3, 44, 34, 0x2D333C);
-        self.fill_rect(444, tb_y + 9, 18, 20, 0x9A4D8B);
-        self.draw_text(448, tb_y + 11, "M", 0xFFFFFF, 0x9A4D8B);
-        if ds.mp.open {
-            let bar_col = if mp_active { 0x0078D7 } else { 0x777777 };
-            self.fill_rect(436, self.height - 2, 36, 2, bar_col);
-        }
-
-        // Photos (Image Viewer) Taskbar Button (482..526)
-        let iv_active = ds.iv.open && ds.focus == 4;
-        let iv_bg = if iv_active { 0x242A34 } else if ds.iv.open { 0x1A1F26 } else { 0x101418 };
-        self.fill_rect(482, tb_y + 3, 44, 34, iv_bg);
-        self.draw_rect_outline(482, tb_y + 3, 44, 34, 0x2D333C);
-        self.fill_rect(494, tb_y + 9, 18, 20, 0x50D090);
-        self.draw_text(498, tb_y + 11, "P", 0x101010, 0x50D090);
-        if ds.iv.open {
-            let bar_col = if iv_active { 0x0078D7 } else { 0x777777 };
-            self.fill_rect(486, self.height - 2, 36, 2, bar_col);
+            let bar_col = if is_active { 0x0078D7 } else { 0x777777 };
+            self.fill_rect(bx + 4, self.height - 2, 36, 2, bar_col);
         }
 
         // System Tray on right
@@ -2422,6 +2590,191 @@ impl Gfx {
         self.draw_text(self.width.saturating_sub(24), tb_y + 12, "[]", if ds.action_center_open { 0xFFFFFF } else { 0x88909D }, ac_bg);
         // Aero Peek strip (extreme right)
         self.fill_rect(self.width - 2, tb_y, 2, tb_h, 0x3A3E48);
+    }
+
+    fn draw_disk_management(&self, ds: &DesktopState, is_active: bool) {
+        if !ds.du.open {
+            return;
+        }
+        let wx = ds.du.x;
+        let wy = ds.du.y;
+        let ww = ds.du.w;
+        let wh = ds.du.h;
+
+        self.draw_window_frame(
+            wx,
+            wy,
+            ww,
+            wh,
+            "Disk Management (diskutil.vex)",
+            "D",
+            0xFFFFFF,
+            0x0078D7,
+            is_active,
+            ds.du.is_maximized,
+        );
+
+        // Menu Bar: File Action View Help
+        self.fill_rect(wx + 1, wy + 32, ww.saturating_sub(2), 24, 0x252525);
+        self.draw_text(wx + 12, wy + 36, "File    Action    View    Help", 0xCCCCCC, 0x252525);
+
+        // Action Toolbar
+        self.fill_rect(wx + 1, wy + 56, ww.saturating_sub(2), 28, 0x1F1F1F);
+        self.fill_rect(wx + 8, wy + 60, 110, 20, 0x2B2B2B);
+        self.draw_rect_outline(wx + 8, wy + 60, 110, 20, 0x3D3D3D);
+        self.draw_text(wx + 14, wy + 63, "[Rescan Disks]", 0x00E5FF, 0x2B2B2B);
+
+        self.fill_rect(wx + 124, wy + 60, 80, 20, 0x2B2B2B);
+        self.draw_rect_outline(wx + 124, wy + 60, 80, 20, 0x3D3D3D);
+        self.draw_text(wx + 130, wy + 63, "[Refresh]", 0xCCCCCC, 0x2B2B2B);
+
+        self.fill_rect(wx + 210, wy + 60, 94, 20, 0x2B2B2B);
+        self.draw_rect_outline(wx + 210, wy + 60, 94, 20, 0x3D3D3D);
+        self.draw_text(wx + 216, wy + 63, "[Properties]", 0xCCCCCC, 0x2B2B2B);
+
+        // Top Pane: Volume Table Header
+        let table_y = wy + 84;
+        self.fill_rect(wx + 1, table_y, ww.saturating_sub(2), 20, 0x2D2D2D);
+        self.draw_text(wx + 8, table_y + 2, "Volume    Layout  Type   File System  Status                    Capacity   Free Space", 0xAAAAAA, 0x2D2D2D);
+
+        // Volume rows
+        let row_data = [
+            ("(C:)      Simple  Basic  VladFS       Healthy (Boot, System)    512 MB     478 MB", 0x0078D7),
+            ("(D:)      Simple  Basic  FAT32        Healthy (Data Partition)   64 MB      58 MB", 0x00B7C3),
+            ("(E:)      Simple  Basic  CDFS         Healthy (CD-ROM Disc)     128 MB       0 MB", 0x9A4D8B),
+            ("(U:)      Simple  Basic  VladFS       Healthy (USB Removable)    32 MB      28 MB", 0x50D090),
+        ];
+
+        for (i, &(r_text, _col)) in row_data.iter().enumerate() {
+            let ry = table_y + 20 + i * 22;
+            let bg = if ds.du.selected_vol == i { 0x004578 } else if i % 2 == 0 { 0x181818 } else { 0x1E1E1E };
+            self.fill_rect(wx + 1, ry, ww.saturating_sub(2), 22, bg);
+            self.draw_text(wx + 8, ry + 3, r_text, 0xFFFFFF, bg);
+        }
+
+        // Split bar
+        let split_y = table_y + 112;
+        self.fill_rect(wx + 1, split_y, ww.saturating_sub(2), 4, 0x383838);
+
+        // Bottom Pane: Physical Disks Graphic Representation
+        let map_y = split_y + 6;
+        let map_h = wh.saturating_sub(map_y - wy + 4);
+        self.fill_rect(wx + 1, map_y, ww.saturating_sub(2), map_h, 0x121212);
+
+        let disks = [
+            ("Disk 0", "Basic", "512 MB", "Online", "(C:) VLADOS_SYS  512 MB VladFS", "Healthy (Boot, Page File)", 0x0078D7),
+            ("Disk 1", "Basic", "64 MB", "Online", "(D:) DATA_DRIVE  64 MB FAT32", "Healthy (Primary Partition)", 0x00B7C3),
+            ("Disk 2", "CD-ROM", "128 MB", "Online", "(E:) VLADOS_ISO  128 MB CDFS", "Healthy (Read-Only)", 0x9A4D8B),
+            ("Disk 3", "Remov.", "32 MB", "Online", "(U:) USB_DRIVE   32 MB VladFS", "Healthy (Active, Removable)", 0x50D090),
+        ];
+
+        for (i, &(d_name, d_type, d_size, d_stat, p_name, p_stat, p_col)) in disks.iter().enumerate() {
+            let dy = map_y + 6 + i * 56;
+            if dy + 50 > wy + wh.saturating_sub(6) {
+                break;
+            }
+
+            // Disk header block
+            self.fill_rect(wx + 8, dy, 120, 50, 0x222222);
+            self.draw_rect_outline(wx + 8, dy, 120, 50, 0x383838);
+            self.draw_text(wx + 14, dy + 4, d_name, 0xFFFFFF, 0x222222);
+            self.draw_text(wx + 14, dy + 18, d_type, 0xAAAAAA, 0x222222);
+            self.draw_text(wx + 14, dy + 32, d_size, 0xAAAAAA, 0x222222);
+            self.draw_text(wx + 70, dy + 18, d_stat, 0x00FF88, 0x222222);
+
+            // Partition block
+            let part_w = ww.saturating_sub(146);
+            self.fill_rect(wx + 132, dy, part_w, 50, 0x1A1A1A);
+            self.draw_rect_outline(wx + 132, dy, part_w, 50, 0x383838);
+            self.fill_rect(wx + 133, dy + 1, part_w - 2, 4, p_col);
+            self.draw_text(wx + 140, dy + 12, p_name, 0xFFFFFF, 0x1A1A1A);
+            self.draw_text(wx + 140, dy + 28, p_stat, 0x888888, 0x1A1A1A);
+        }
+    }
+
+    fn draw_path_editor(&self, ds: &DesktopState, is_active: bool) {
+        if !ds.pe.open {
+            return;
+        }
+        let wx = ds.pe.x;
+        let wy = ds.pe.y;
+        let ww = ds.pe.w;
+        let wh = ds.pe.h;
+
+        self.draw_window_frame(
+            wx,
+            wy,
+            ww,
+            wh,
+            "Environment Variables - System PATH (pathedit.vex)",
+            "P",
+            0xFFFFFF,
+            0x008272,
+            is_active,
+            ds.pe.is_maximized,
+        );
+
+        // Header description
+        self.fill_rect(wx + 1, wy + 32, ww.saturating_sub(2), wh.saturating_sub(34), 0x202020);
+        self.draw_text(wx + 16, wy + 42, "Edit System Environment Variable: PATH", 0xFFFFFF, 0x202020);
+        self.draw_text(wx + 16, wy + 62, "Specifies directories where executable (.vex) files are located.", 0xAAAAAA, 0x202020);
+        self.draw_text(wx + 16, wy + 78, r"Default PATH strictly set to: C:\VladOS\System32", 0x00E5FF, 0x202020);
+
+        // List box for PATH entries
+        let list_x = wx + 16;
+        let list_y = wy + 104;
+        let list_w = ww.saturating_sub(160);
+        let list_h = wh.saturating_sub(164);
+
+        self.fill_rect(list_x, list_y, list_w, list_h, 0x141414);
+        self.draw_rect_outline(list_x, list_y, list_w, list_h, 0x3D3D3D);
+
+        let path_entries = [
+            r"C:\VladOS\System32 (Default Windows System)",
+            r"C:\VladOS (Root OS directory)",
+            r"C:\Users\Vlad\Desktop (User Desktop Applications)",
+            r"C:\Users\Vlad\Downloads (User Downloads)",
+        ];
+
+        for (i, entry) in path_entries.iter().enumerate() {
+            let ey = list_y + 4 + i * 26;
+            if ey + 24 > list_y + list_h { break; }
+            let is_sel = ds.pe.selected_idx == i;
+            let bg = if is_sel { 0x0078D7 } else { 0x141414 };
+            self.fill_rect(list_x + 2, ey, list_w - 4, 24, bg);
+            self.draw_text(list_x + 8, ey + 4, entry, 0xFFFFFF, bg);
+        }
+
+        // Action Buttons on Right
+        let btn_x = wx + ww.saturating_sub(130);
+        let btn_w = 114;
+        let btn_labels = [
+            ("[New...]", 104),
+            ("[Edit...]", 138),
+            ("[Delete]", 172),
+            ("[Move Up]", 206),
+            ("[Move Down]", 240),
+            ("[Reset Default]", 284),
+        ];
+
+        for &(label, by) in &btn_labels {
+            self.fill_rect(btn_x, wy + by, btn_w, 26, 0x2E2E2E);
+            self.draw_rect_outline(btn_x, wy + by, btn_w, 26, 0x484848);
+            self.draw_text(btn_x + 12, wy + by + 5, label, 0xFFFFFF, 0x2E2E2E);
+        }
+
+        // Bottom status & OK/Cancel buttons
+        let status_y = wy + wh - 48;
+        self.draw_text(wx + 16, status_y + 8, ds.pe.status_text, 0x00FF88, 0x202020);
+
+        let ok_x = wx + ww - 190;
+        self.fill_rect(ok_x, status_y + 4, 80, 28, 0x0078D7);
+        self.draw_text(ok_x + 18, status_y + 10, "[OK]", 0xFFFFFF, 0x0078D7);
+
+        let cancel_x = ok_x + 90;
+        self.fill_rect(cancel_x, status_y + 4, 84, 28, 0x333333);
+        self.draw_rect_outline(cancel_x, status_y + 4, 84, 28, 0x555555);
+        self.draw_text(cancel_x + 12, status_y + 10, "[Cancel]", 0xCCCCCC, 0x333333);
     }
 
     fn render_windows(&self, ds: &DesktopState, term: &TerminalState) {
@@ -2458,6 +2811,16 @@ impl Gfx {
                 5 => {
                     if ds.mp.open {
                         self.draw_media_player(&ds.mp, is_active);
+                    }
+                }
+                6 => {
+                    if ds.du.open {
+                        self.draw_disk_management(ds, is_active);
+                    }
+                }
+                7 => {
+                    if ds.pe.open {
+                        self.draw_path_editor(ds, is_active);
                     }
                 }
                 _ => {}
@@ -3272,7 +3635,7 @@ impl CursorManager {
             for col in 0..BG_BUF_SIZE {
                 let px = mx + col;
                 if px < gfx.width && py < gfx.height {
-                    let color = unsafe { *gfx.fb.add(py * gfx.stride + px) };
+                    let color = unsafe { *gfx.bb.add(py * gfx.stride + px) };
                     self.saved_bg[row * BG_BUF_SIZE + col] = color;
                 } else {
                     self.saved_bg[row * BG_BUF_SIZE + col] = 0;
@@ -3290,7 +3653,7 @@ impl CursorManager {
                         let sx = mx + cx + so_x;
                         let sy = my + cy + so_y;
                         if sx < gfx.width && sy < gfx.height {
-                            let curr = unsafe { *gfx.fb.add(sy * gfx.stride + sx) };
+                            let curr = unsafe { *gfx.bb.add(sy * gfx.stride + sx) };
                             let r = ((curr >> 16) & 0xFF) * (100 - dark_pct) / 100;
                             let g = ((curr >> 8) & 0xFF) * (100 - dark_pct) / 100;
                             let b = (curr & 0xFF) * (100 - dark_pct) / 100;
@@ -3787,7 +4150,21 @@ fn launch_vex(path: &str, ds: &mut DesktopState, term: &mut TerminalState) {
         clean
     };
 
-    if eq_ignore_ascii_case(name, "calc.vex") || eq_ignore_ascii_case(name, "calc") {
+    if eq_ignore_ascii_case(name, "diskutil.vex")
+        || eq_ignore_ascii_case(name, "diskutil")
+        || eq_ignore_ascii_case(name, "disk management.lnk")
+    {
+        ds.du.open = true;
+        ds.bring_to_front(6);
+        term.add_line("[Started Disk Management: diskutil.vex]");
+    } else if eq_ignore_ascii_case(name, "pathedit.vex")
+        || eq_ignore_ascii_case(name, "pathedit")
+        || eq_ignore_ascii_case(name, "environment path.lnk")
+    {
+        ds.pe.open = true;
+        ds.bring_to_front(7);
+        term.add_line("[Started Environment PATH Editor: pathedit.vex]");
+    } else if eq_ignore_ascii_case(name, "calc.vex") || eq_ignore_ascii_case(name, "calc") {
         ds.calc.open = true;
         ds.bring_to_front(3);
         term.add_line("[Started Calculator: calc.vex]");
@@ -4204,102 +4581,32 @@ fn handle_mouse_click(
         return;
     }
 
-    // 2. Taskbar App Icons
-    if my >= tb_y && mx >= 232 && mx <= 276 {
-        // CMD Button
-        if ds.cmd_open && ds.focus == 0 {
-            ds.cmd_open = false;
-            let (wx, wy, ww, wh) = ds.get_rect(0);
-            gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
-            term.add_line("[Taskbar: CMD minimized]");
-        } else {
-            ds.cmd_open = true;
-            ds.bring_to_front(0);
-            term.add_line("[Taskbar: CMD activated]");
+    // 2. Dynamic Taskbar App Buttons (Windows 10 EnumWindows style)
+    if my >= tb_y && mx >= 232 {
+        let mut open_wins = [0usize; 8];
+        let mut open_count = 0;
+        for wid in 0..8 {
+            if ds.is_open(wid) {
+                open_wins[open_count] = wid;
+                open_count += 1;
+            }
         }
-        gfx.render_windows(ds, term);
-        return;
-    }
-
-    if my >= tb_y && mx >= 282 && mx <= 326 {
-        // File Explorer Button
-        if ds.fe.open && ds.focus == 1 {
-            ds.fe.open = false;
-            let (wx, wy, ww, wh) = ds.get_rect(1);
-            gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
-            term.add_line("[Taskbar: File Explorer minimized]");
-        } else {
-            ds.fe.open = true;
-            ds.bring_to_front(1);
-            term.add_line("[Taskbar: File Explorer activated]");
+        let btn_idx = (mx - 232) / 48;
+        if btn_idx < open_count {
+            let wid = open_wins[btn_idx];
+            if ds.is_open(wid) && ds.focus == wid {
+                ds.set_open(wid, false); // Minimize
+                let (wx, wy, ww, wh) = ds.get_rect(wid);
+                gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
+                term.add_line("[Taskbar: Window minimized]");
+            } else {
+                ds.set_open(wid, true);
+                ds.bring_to_front(wid);
+                term.add_line("[Taskbar: Window activated]");
+            }
+            gfx.render_windows(ds, term);
+            return;
         }
-        gfx.render_windows(ds, term);
-        return;
-    }
-
-    if my >= tb_y && mx >= 332 && mx <= 376 {
-        // Notepad Button
-        if ds.np.open && ds.focus == 2 {
-            ds.np.open = false;
-            let (wx, wy, ww, wh) = ds.get_rect(2);
-            gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
-            term.add_line("[Taskbar: Notepad minimized]");
-        } else {
-            ds.np.open = true;
-            ds.bring_to_front(2);
-            term.add_line("[Taskbar: Notepad activated]");
-        }
-        gfx.render_windows(ds, term);
-        return;
-    }
-
-    if my >= tb_y && mx >= 382 && mx <= 426 {
-        // Calculator Button
-        if ds.calc.open && ds.focus == 3 {
-            ds.calc.open = false;
-            let (wx, wy, ww, wh) = ds.get_rect(3);
-            gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
-            term.add_line("[Taskbar: Calculator minimized]");
-        } else {
-            ds.calc.open = true;
-            ds.bring_to_front(3);
-            term.add_line("[Taskbar: Calculator activated]");
-        }
-        gfx.render_windows(ds, term);
-        return;
-    }
-
-    if my >= tb_y && mx >= 432 && mx <= 476 {
-        // Media Player Button
-        if ds.mp.open && ds.focus == 5 {
-            ds.mp.open = false;
-            let (wx, wy, ww, wh) = ds.get_rect(5);
-            gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
-            term.add_line("[Taskbar: Media Player minimized]");
-        } else {
-            ds.mp.open = true;
-            ds.bring_to_front(5);
-            ds.mp.play();
-            term.add_line("[Taskbar: Media Player activated]");
-        }
-        gfx.render_windows(ds, term);
-        return;
-    }
-
-    if my >= tb_y && mx >= 482 && mx <= 526 {
-        // Photos Button
-        if ds.iv.open && ds.focus == 4 {
-            ds.iv.open = false;
-            let (wx, wy, ww, wh) = ds.get_rect(4);
-            gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
-            term.add_line("[Taskbar: Photos minimized]");
-        } else {
-            ds.iv.open = true;
-            ds.bring_to_front(4);
-            term.add_line("[Taskbar: Photos activated]");
-        }
-        gfx.render_windows(ds, term);
-        return;
     }
 
     // 2b. Taskbar System Tray Items
@@ -4919,13 +5226,13 @@ fn handle_mouse_click(
                 gfx.render_windows(ds, term);
                 return;
             } else if my >= 232 && my <= 292 {
-                // File Explorer shortcut (.lnk)
-                launch_vex("explorer.vex", ds, term);
+                // Disk Management shortcut (.lnk)
+                launch_vex("diskutil.vex", ds, term);
                 gfx.render_windows(ds, term);
                 return;
             } else if my >= 304 && my <= 364 {
-                // Notepad shortcut (.lnk)
-                launch_vex("notepad.vex", ds, term);
+                // File Explorer shortcut (.lnk)
+                launch_vex("explorer.vex", ds, term);
                 gfx.render_windows(ds, term);
                 return;
             }
@@ -4933,28 +5240,28 @@ fn handle_mouse_click(
         // Column 1: x: 100..180
         if mx >= 100 && mx <= 180 {
             if my >= 16 && my <= 76 {
+                // Environment PATH shortcut (.lnk)
+                launch_vex("pathedit.vex", ds, term);
+                gfx.render_windows(ds, term);
+                return;
+            } else if my >= 88 && my <= 148 {
+                // Notepad shortcut (.lnk)
+                launch_vex("notepad.vex", ds, term);
+                gfx.render_windows(ds, term);
+                return;
+            } else if my >= 160 && my <= 220 {
                 // Calculator shortcut (.lnk)
                 launch_vex("calc.vex", ds, term);
                 gfx.render_windows(ds, term);
                 return;
-            } else if my >= 88 && my <= 148 {
+            } else if my >= 232 && my <= 292 {
                 // Media Player shortcut (.lnk)
                 launch_vex("player.vex", ds, term);
                 gfx.render_windows(ds, term);
                 return;
-            } else if my >= 160 && my <= 220 {
+            } else if my >= 304 && my <= 364 {
                 // Photos shortcut (.lnk)
                 launch_vex("photos.vex", ds, term);
-                gfx.render_windows(ds, term);
-                return;
-            } else if my >= 232 && my <= 292 {
-                // Control Panel shortcut (.lnk)
-                launch_vex("control panel.lnk", ds, term);
-                gfx.render_windows(ds, term);
-                return;
-            } else if my >= 304 && my <= 364 {
-                // Welcome.txt
-                launch_vex("C:\\VladOS\\Welcome.txt", ds, term);
                 gfx.render_windows(ds, term);
                 return;
             }
@@ -5019,6 +5326,7 @@ pub extern "C" fn _start() -> ! {
     // 2. Initialize Windows 10 Aero Cursor Manager
     let mut cursor = CursorManager::new(450, 260);
     cursor.show(&gfx);
+    gfx.present();
 
     // Make stdin (fd 0) non-blocking so keyboard polling never stalls mouse / touch tracking!
     unsafe {
@@ -5418,6 +5726,10 @@ pub extern "C" fn _start() -> ! {
             cursor.hide(&gfx);
             gfx.draw_media_player(&ds.mp, ds.focus == 5);
             cursor.show(&gfx);
+        }
+
+        if had_event {
+            gfx.present();
         }
 
         if !had_event {
