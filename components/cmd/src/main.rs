@@ -1,3 +1,4 @@
+#![allow(static_mut_refs)]
 #![no_std]
 #![no_main]
 
@@ -53,8 +54,20 @@ unsafe fn sys_yield() {
     );
 }
 
-const SYS_VLADOS_VFS_READ: usize = 0x5646;
-const SYS_VLADOS_VFS_LIST: usize = 0x564C;
+// -----------------------------------------------------------------------------
+// VladOS VFS and RBAC Security Syscalls
+// -----------------------------------------------------------------------------
+
+const SYS_VLADOS_VFS_READ: usize   = 0x5646;
+const SYS_VLADOS_VFS_WRITE: usize  = 0x5647;
+const SYS_VLADOS_VFS_MKDIR: usize  = 0x5648;
+const SYS_VLADOS_VFS_UNLINK: usize = 0x5649;
+const SYS_VLADOS_VFS_RENAME: usize = 0x564A;
+const SYS_VLADOS_VFS_LIST: usize   = 0x564C;
+const SYS_VLADOS_VFS_CHMOD: usize  = 0x564E;
+const SYS_VLADOS_WHOAMI: usize     = 0x5650;
+const SYS_VLADOS_SU: usize         = 0x5651;
+const SYS_VLADOS_DRIVES: usize     = 0x5652;
 
 #[inline(always)]
 unsafe fn sys_vfs_read(path: &str, buf: &mut [u8]) -> usize {
@@ -66,6 +79,70 @@ unsafe fn sys_vfs_read(path: &str, buf: &mut [u8]) -> usize {
         in("rsi") path.len(),
         in("rdx") buf.as_mut_ptr() as usize,
         in("r10") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_write(path: &str, data: &[u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_WRITE => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") data.as_ptr() as usize,
+        in("r10") data.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_mkdir(path: &str) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_MKDIR => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_unlink(path: &str) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_UNLINK => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_rename(old_path: &str, new_path: &str) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_RENAME => ret,
+        in("rdi") old_path.as_ptr() as usize,
+        in("rsi") old_path.len(),
+        in("rdx") new_path.as_ptr() as usize,
+        in("r10") new_path.len(),
         out("rcx") _,
         out("r11") _,
         options(nostack)
@@ -90,6 +167,67 @@ unsafe fn sys_vfs_list(path: &str, buf: &mut [u8]) -> usize {
     ret
 }
 
+#[inline(always)]
+unsafe fn sys_vfs_chmod(path: &str, mode: usize, flags: usize) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_CHMOD => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") mode,
+        in("r10") flags,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_whoami(buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_WHOAMI => ret,
+        in("rdi") buf.as_mut_ptr() as usize,
+        in("rsi") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_su(uid: usize) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_SU => ret,
+        in("rdi") uid,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_drives(buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_DRIVES => ret,
+        in("rdi") buf.as_mut_ptr() as usize,
+        in("rsi") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
 fn print(s: &str) {
     unsafe {
         sys_write(1, s.as_bytes());
@@ -98,146 +236,233 @@ fn print(s: &str) {
 
 fn println(s: &str) {
     print(s);
-    print("\n");
+    print("\r\n");
 }
 
-const COMMANDS: &[&str] = &[
-    "cls",
-    "dir",
-    "echo",
-    "exit",
-    "explorer",
-    "help",
-    "menu",
-    "start",
-    "sysinfo",
-    "type",
-    "ver",
-];
-
-const FILES: &[&str] = &[
-    "account.cfg",
-    "cmd.vex",
-    "config",
-    "drivers",
-    "explorer.vex",
-    "system.ini",
-    "vladinit.vex",
-];
-
-fn print_prompt() {
-    print("C:\\VladOS\\System32> ");
+fn starts_with_ignore_case(s: &str, prefix: &str) -> bool {
+    if s.len() < prefix.len() {
+        return false;
+    }
+    s[..prefix.len()].eq_ignore_ascii_case(prefix)
 }
 
-fn handle_command(cmd: &str) {
-    let cmd = cmd.trim();
+fn eq_ignore_ascii_case(a: &str, b: &str) -> bool {
+    a.eq_ignore_ascii_case(b)
+}
+
+static mut DIR_BUF: [u8; 4096] = [0u8; 4096];
+static mut FILE_BUF: [u8; 8192] = [0u8; 8192];
+static mut INFO_BUF: [u8; 2048] = [0u8; 2048];
+
+fn handle_command(cmd_line: &str) {
+    let cmd = cmd_line.trim();
     if cmd.is_empty() {
         return;
     }
 
     if eq_ignore_ascii_case(cmd, "help") {
-        println("For more information on a specific command, type HELP command-name");
-        println("CLS        Clears the screen.");
-        println("DIR        Displays a list of files and subdirectories in a directory.");
-        println("ECHO       Displays messages, or turns command echoing on or off.");
-        println("EXIT       Quits CMD.VEX and returns to Windows 10 Start Menu.");
-        println("EXPLORER   Launches Windows 10 Desktop Shell / Start Menu.");
-        println("HELP       Provides Help information for VladOS commands.");
-        println("START      Opens the Windows 10 Start Menu (explorer.vex).");
-        println("SYSINFO    Displays VladOS machine and OS configuration.");
-        println("TYPE       Displays the contents of a text file.");
-        println("VER        Displays the VladOS version.");
+        println("VladOS 10 Professional - Command Prompt Reference:");
+        println("--------------------------------------------------");
+        println("  DIR [path]         - List directory contents on C:, D:, or E:");
+        println("  TYPE <file>        - Display contents of a text file");
+        println("  ECHO <text>        - Print text (use '> file' to create/write)");
+        println("  MKDIR <path>       - Create a new directory");
+        println("  DEL / RM <path>    - Delete a file");
+        println("  REN <old> <new>    - Rename a file or directory");
+        println("  CHMOD <mode> <p>   - Change permissions (e.g. chmod 755 /path)");
+        println("  ATTRIB <path>      - Change file attributes");
+        println("  DRIVES             - List all mounted volumes (C:, D:, E:)");
+        println("  WHOAMI             - Display current user, SID, role, and privileges");
+        println("  NET USER           - List system security accounts");
+        println("  SU <user>          - Switch user context (Vlad, System, User, Guest)");
+        println("  SYSINFO            - Display system hardware & OS information");
+        println("  EXPLORER           - Switch to Windows 10 File Explorer & Desktop");
+        println("  CLS                - Clear screen");
+        println("  VER                - Print VladOS version information");
+        println("  EXIT               - Return to graphical desktop");
     } else if eq_ignore_ascii_case(cmd, "ver") {
-        println("VladOS [Version 10.0.22000.1] - 64-bit Hybrid Kernel");
+        println("VladOS [Version 10.0.22000.1] - 64-bit Hybrid Microkernel");
     } else if eq_ignore_ascii_case(cmd, "cls") {
         print("\x1b[2J\x1b[H");
+    } else if eq_ignore_ascii_case(cmd, "whoami") {
+        let n = unsafe { sys_whoami(&mut INFO_BUF) };
+        if n > 0 && n <= 2048 {
+            if let Ok(s) = core::str::from_utf8(unsafe { &INFO_BUF[..n] }) {
+                print(s);
+            }
+        }
+    } else if eq_ignore_ascii_case(cmd, "net user") {
+        println("User Accounts for \\\\VLADOS-PC");
+        println("-------------------------------------------------------------------------------");
+        println("SYSTEM                   Vlad                     User");
+        println("Guest                    DefaultAccount");
+        println("The command completed successfully.");
+    } else if starts_with_ignore_case(cmd, "su ") || starts_with_ignore_case(cmd, "runas ") {
+        let arg = if starts_with_ignore_case(cmd, "su ") {
+            cmd[3..].trim()
+        } else {
+            cmd[6..].trim()
+        };
+        let uid = if eq_ignore_ascii_case(arg, "system") || eq_ignore_ascii_case(arg, "root") || arg == "0" {
+            0
+        } else if eq_ignore_ascii_case(arg, "vlad") || eq_ignore_ascii_case(arg, "admin") || arg == "1000" {
+            1000
+        } else if eq_ignore_ascii_case(arg, "user") || arg == "1001" {
+            1001
+        } else if eq_ignore_ascii_case(arg, "guest") || arg == "1002" {
+            1002
+        } else {
+            usize::MAX
+        };
+
+        if uid == usize::MAX {
+            println("Account not found. Available: SYSTEM, Vlad, User, Guest");
+        } else {
+            let ret = unsafe { sys_su(uid) };
+            if ret == 0 {
+                print("Switched security context to: ");
+                println(arg);
+            } else {
+                println("Failed to switch user: Permission Denied");
+            }
+        }
+    } else if eq_ignore_ascii_case(cmd, "drives") || eq_ignore_ascii_case(cmd, "wmic logicaldisk") {
+        println("Mounted Logical Drives & Volumes:");
+        println("-------------------------------------------------------------------------------");
+        let n = unsafe { sys_drives(&mut INFO_BUF) };
+        if n > 0 && n <= 2048 {
+            if let Ok(s) = core::str::from_utf8(unsafe { &INFO_BUF[..n] }) {
+                print(s);
+            }
+        }
     } else if eq_ignore_ascii_case(cmd, "sysinfo") {
         println("Host Name:                 VLADOS-PC");
         println("OS Name:                   VladOS 10 Professional");
-        println("OS Version:                1.0.0 Build 2026.09.05");
+        println("OS Version:                1.0.0 Build 2026.09.06");
         println("OS Architecture:           x86_64 Long Mode (64-bit)");
         println("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
-        println("Start Menu:                Active (Pinned: CMD, SysInfo, Explorer)");
-        println("Executable Standard:       .vex (Vlad EXecutable)");
-        println("Root Filesystem:           VladFS (Volume: VLADOS_SYS)");
+        println("File Explorer:             Windows 10 Explorer Window Active");
+        println("Drivers:                   /VladOS/System32/drivers/ (10 Native .sys Drivers)");
+        println("Primary Filesystem:        VladFS (Volume: VLADOS_SYS on Drive C:)");
+        println("Secondary Filesystem:      FAT32 / EXT2 (Volume: DATA_DRIVE on Drive D:)");
+        println("Optical Media:             ISO9660 (Volume: VLADOS_INSTALL on Drive E:)");
+        println("Security Subsystem:        RBAC (SYSTEM, Administrator Vlad, Users, Guest)");
         println("Display:                   1280x800x32 Linear GOP Framebuffer");
-        println("Theme Engine:              Windows 10 Fluent Dark");
         println("Cloud Portal:              https://vladinc.ru/vlados/");
     } else if eq_ignore_ascii_case(cmd, "dir") || starts_with_ignore_case(cmd, "dir ") {
         let dir_target = if starts_with_ignore_case(cmd, "dir ") {
             cmd[4..].trim()
         } else {
-            "/VladOS/System32"
+            "C:\\"
         };
-        let normalized = if dir_target.starts_with("C:") || dir_target.starts_with("c:") {
-            &dir_target[2..]
-        } else {
-            dir_target
-        };
-        let lookup_path = if normalized.is_empty() { "/" } else { normalized };
 
-        println(" Volume in drive C is VLADOS_SYS");
-        println(" Volume Serial Number is 564C-4144");
-        print(" Directory of C:");
-        println(lookup_path);
+        println(" Directory of ");
+        println(dir_target);
         println("");
+        println("Mode        Type             Size Owner    Name");
+        println("----------  ---------- ---------- -------- -----------------------------");
 
-        static mut DIR_BUF: [u8; 4096] = [0u8; 4096];
-        let n = unsafe { sys_vfs_list(lookup_path, &mut DIR_BUF) };
+        let n = unsafe { sys_vfs_list(dir_target, &mut DIR_BUF) };
         if n > 0 && n <= 4096 {
             if let Ok(s) = core::str::from_utf8(unsafe { &DIR_BUF[..n] }) {
                 print(s);
             }
         } else {
-            println("09/06/2026  01:00 PM    <DIR>          config");
-            println("09/06/2026  01:00 PM    <DIR>          drivers");
-            println("09/06/2026  01:00 PM             1,350 vladinit.vex");
-            println("09/06/2026  01:00 PM             2,840 explorer.vex");
-            println("09/06/2026  01:00 PM             2,180 cmd.vex");
+            println("File Not Found or Access Denied.");
         }
-    } else if starts_with_ignore_case(cmd, "echo ") {
-        println(&cmd[5..]);
-    } else if starts_with_ignore_case(cmd, "type ") {
-        let file = cmd[5..].trim();
-        let normalized = if file.starts_with("C:") || file.starts_with("c:") {
-            &file[2..]
+    } else if starts_with_ignore_case(cmd, "mkdir ") || starts_with_ignore_case(cmd, "md ") {
+        let p = if starts_with_ignore_case(cmd, "mkdir ") {
+            cmd[6..].trim()
         } else {
-            file
+            cmd[3..].trim()
         };
-
-        static mut FILE_BUF: [u8; 8192] = [0u8; 8192];
-        let n = unsafe { sys_vfs_read(normalized, &mut FILE_BUF) };
-        if n > 0 && n <= 8192 {
-            if let Ok(s) = core::str::from_utf8(unsafe { &FILE_BUF[..n] }) {
-                println(s);
+        let ret = unsafe { sys_vfs_mkdir(p) };
+        if ret > 0 {
+            print("Created directory: ");
+            println(p);
+        } else {
+            println("Failed to create directory (Access Denied or Directory Exists).");
+        }
+    } else if starts_with_ignore_case(cmd, "del ") || starts_with_ignore_case(cmd, "rm ") {
+        let p = if starts_with_ignore_case(cmd, "del ") {
+            cmd[4..].trim()
+        } else {
+            cmd[3..].trim()
+        };
+        let ret = unsafe { sys_vfs_unlink(p) };
+        if ret == 0 {
+            print("Deleted file: ");
+            println(p);
+        } else {
+            println("Cannot delete file (File Not Found or Access Denied).");
+        }
+    } else if starts_with_ignore_case(cmd, "ren ") {
+        let parts = cmd[4..].trim();
+        if let Some(idx) = parts.find(' ') {
+            let old_p = parts[..idx].trim();
+            let new_p = parts[idx + 1..].trim();
+            let ret = unsafe { sys_vfs_rename(old_p, new_p) };
+            if ret == 0 {
+                println("File renamed successfully.");
             } else {
-                println("[Binary Resource File]");
+                println("Failed to rename file.");
             }
         } else {
-            // Also try with /VladOS/System32/ prefix
-            let mut pref_buf = [0u8; 128];
-            let prefix = b"/VladOS/System32/";
-            pref_buf[..prefix.len()].copy_from_slice(prefix);
-            let name_bytes = normalized.trim_start_matches('/').as_bytes();
-            let total = (prefix.len() + name_bytes.len()).min(128);
-            pref_buf[prefix.len()..total].copy_from_slice(&name_bytes[..total - prefix.len()]);
-            let mut found = false;
-            if let Ok(full_path) = core::str::from_utf8(&pref_buf[..total]) {
-                let n2 = unsafe { sys_vfs_read(full_path, &mut FILE_BUF) };
-                if n2 > 0 && n2 <= 8192 {
-                    if let Ok(s) = core::str::from_utf8(unsafe { &FILE_BUF[..n2] }) {
-                        println(s);
-                        found = true;
-                    }
+            println("Syntax: REN <old_path> <new_name>");
+        }
+    } else if starts_with_ignore_case(cmd, "chmod ") {
+        let parts = cmd[6..].trim();
+        if let Some(idx) = parts.find(' ') {
+            let mode_str = parts[..idx].trim();
+            let path = parts[idx + 1..].trim();
+            let mut mode = 0usize;
+            for b in mode_str.bytes() {
+                if b >= b'0' && b <= b'7' {
+                    mode = (mode << 3) | (b - b'0') as usize;
                 }
             }
-            if !found {
-                print("The system cannot find the file specified: ");
-                println(file);
+            let ret = unsafe { sys_vfs_chmod(path, mode, 0) };
+            if ret == 0 {
+                println("Permissions changed successfully.");
+            } else {
+                println("Failed to change permissions (Access Denied).");
             }
+        } else {
+            println("Syntax: CHMOD <octal_mode> <path>");
+        }
+    } else if starts_with_ignore_case(cmd, "echo ") {
+        let rest = cmd[5..].trim();
+        if let Some(idx) = rest.find('>') {
+            let text = rest[..idx].trim();
+            let path = rest[idx + 1..].trim();
+            let ret = unsafe { sys_vfs_write(path, text.as_bytes()) };
+            if ret > 0 {
+                print("Written ");
+                print(text);
+                print(" -> ");
+                println(path);
+            } else {
+                println("Access Denied or Write Protected volume.");
+            }
+        } else {
+            println(rest);
+        }
+    } else if starts_with_ignore_case(cmd, "type ") {
+        let file = cmd[5..].trim();
+        let n = unsafe { sys_vfs_read(file, &mut FILE_BUF) };
+        if n > 0 && n <= 8192 {
+            if let Ok(s) = core::str::from_utf8(unsafe { &FILE_BUF[..n] }) {
+                print(s);
+                println("");
+            } else {
+                println("[Binary File]");
+            }
+        } else {
+            print("The system cannot find the file specified: ");
+            println(file);
         }
     } else if eq_ignore_ascii_case(cmd, "exit") || eq_ignore_ascii_case(cmd, "explorer") || eq_ignore_ascii_case(cmd, "start") || eq_ignore_ascii_case(cmd, "menu") {
-        println("Returning to Windows 10 Start Menu (explorer.vex)...");
+        println("Returning to Windows 10 Start Menu & File Explorer (explorer.vex)...");
         let explorer_entry: extern "C" fn() -> ! = unsafe { core::mem::transmute(0x100000usize) };
         explorer_entry();
     } else {
@@ -248,123 +473,54 @@ fn handle_command(cmd: &str) {
     }
 }
 
-fn eq_ignore_ascii_case(a: &str, b: &str) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    for (ca, cb) in a.bytes().zip(b.bytes()) {
-        if ca.to_ascii_lowercase() != cb.to_ascii_lowercase() {
-            return false;
-        }
-    }
-    true
-}
-
-fn starts_with_ignore_case(a: &str, prefix: &str) -> bool {
-    if a.len() < prefix.len() {
-        return false;
-    }
-    eq_ignore_ascii_case(&a[..prefix.len()], prefix)
-}
-
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    print("\x1b[2J\x1b[H"); // Clear screen
     println("VladOS [Version 10.0.22000.1]");
     println("(c) 2026 Vlad Corporation. All rights reserved.");
     println("");
-    print_prompt();
+    println("VladOS Command Prompt (Administrator). Type HELP for available commands.");
+    println("");
 
-    let mut line_buf = [0u8; 128];
-    let mut line_len: usize = 0;
-    let mut read_buf = [0u8; 16];
+    let mut buf = [0u8; 256];
+    let mut len = 0;
 
     loop {
-        let n = unsafe { sys_read(0, &mut read_buf) };
-        if n > 0 && n <= read_buf.len() {
-            for i in 0..n {
-                let b = read_buf[i];
-                if b == b'\r' || b == b'\n' {
-                    println("");
-                    if line_len > 0 {
-                        if let Ok(cmd_str) = core::str::from_utf8(&line_buf[..line_len]) {
-                            handle_command(cmd_str);
-                        }
-                        line_len = 0;
-                    }
-                    print_prompt();
-                } else if b == 0x08 || b == 0x7F {
-                    // Backspace
-                    if line_len > 0 {
-                        line_len -= 1;
-                        print("\x08");
-                    }
-                } else if b == 0x09 {
-                    // Tab auto-completion
-                    if line_len > 0 {
-                        if let Ok(curr) = core::str::from_utf8(&line_buf[..line_len]) {
-                            if let Some(space_pos) = curr.rfind(' ') {
-                                let prefix = &curr[space_pos + 1..];
-                                if !prefix.is_empty() {
-                                    for &f in FILES {
-                                        if starts_with_ignore_case(f, prefix) {
-                                            for _ in 0..prefix.len() {
-                                                print("\x08");
-                                            }
-                                            line_len = space_pos + 1;
-                                            for byte in f.bytes() {
-                                                if line_len < line_buf.len() {
-                                                    line_buf[line_len] = byte;
-                                                    line_len += 1;
-                                                }
-                                            }
-                                            print(f);
-                                            break;
-                                        }
-                                    }
-                                }
-                            } else {
-                                for &c in COMMANDS {
-                                    if starts_with_ignore_case(c, curr) {
-                                        for _ in 0..line_len {
-                                            print("\x08");
-                                        }
-                                        line_len = 0;
-                                        for byte in c.bytes() {
-                                            if line_len < line_buf.len() {
-                                                line_buf[line_len] = byte;
-                                                line_len += 1;
-                                            }
-                                        }
-                                        if line_len < line_buf.len() {
-                                            line_buf[line_len] = b' ';
-                                            line_len += 1;
-                                        }
-                                        print(c);
-                                        print(" ");
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else if b == 0x03 {
-                    // Ctrl+C
-                    println("^C");
-                    line_len = 0;
-                    print_prompt();
-                } else if b >= 32 && b <= 126 {
-                    // Printable ASCII
-                    if line_len + 1 < line_buf.len() {
-                        line_buf[line_len] = b;
-                        line_len += 1;
-                        let echo = [b];
-                        unsafe { sys_write(1, &echo) };
+        print("C:\\VladOS\\System32> ");
+
+        len = 0;
+        loop {
+            let mut ch = [0u8; 1];
+            let n = unsafe { sys_read(0, &mut ch) };
+            if n == 0 {
+                unsafe { sys_yield() };
+                continue;
+            }
+
+            let c = ch[0];
+            if c == b'\r' || c == b'\n' {
+                print("\r\n");
+                break;
+            } else if c == 8 || c == 127 {
+                // Backspace
+                if len > 0 {
+                    len -= 1;
+                    print("\x08 \x08");
+                }
+            } else if c >= 32 && c < 127 {
+                if len < buf.len() {
+                    buf[len] = c;
+                    len += 1;
+                    unsafe {
+                        sys_write(1, &[c]);
                     }
                 }
             }
-        } else {
-            unsafe {
-                sys_yield();
+        }
+
+        if len > 0 {
+            if let Ok(cmd_line) = core::str::from_utf8(&buf[..len]) {
+                handle_command(cmd_line);
             }
         }
     }
@@ -372,7 +528,6 @@ pub extern "C" fn _start() -> ! {
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    println("[cmd.vex] CRITICAL PANIC in Ring 3!");
     loop {
         unsafe {
             sys_yield();

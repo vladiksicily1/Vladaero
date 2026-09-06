@@ -44,6 +44,7 @@ VLADINIT_BIN="$REPO_DIR/components/vladinit/target/x86_64-unknown-none/release/v
 echo "2. Preparing VladOS system root ($SYSROOT_DIR)..."
 mkdir -p "$SYSROOT_DIR/VladOS/System32/config"
 mkdir -p "$SYSROOT_DIR/VladOS/System32/drivers"
+cp -r "$REPO_DIR/resources/drivers/"* "$SYSROOT_DIR/VladOS/System32/drivers/"
 mkdir -p "$SYSROOT_DIR/VladOS/Resources"
 cp -r "$REPO_DIR/resources/"* "$SYSROOT_DIR/VladOS/Resources/"
 mkdir -p "$SYSROOT_DIR/Users/Default"
@@ -112,6 +113,8 @@ mcopy -o -i "$ESP_TMP" "$BOOTLOADER_EFI" ::EFI/BOOT/BOOTX64.EFI
 mcopy -o -i "$ESP_TMP" "$KERNEL_ELF" ::kernel.elf
 mcopy -o -i "$ESP_TMP" "$KERNEL_ELF" ::EFI/BOOT/kernel.elf
 mcopy -o -i "$ESP_TMP" "$VLADFS_IMG" ::vladfs.img
+echo -ne '\\EFI\\BOOT\\BOOTX64.EFI\r\n' > /tmp/startup.nsh
+mcopy -o -i "$ESP_TMP" /tmp/startup.nsh ::startup.nsh
 
 echo "4. Creating two-partition GPT disk image ($OUTPUT_IMG)..."
 # 1MiB GPT header + 64MiB ESP + 32MiB VladFS + 1MiB backup GPT = 98MiB

@@ -51,11 +51,12 @@ pub struct FileRecord {
     pub modified_time: u64,
     pub extent_count: u32,
     pub name_len: u16,
-    pub reserved1: u16,
+    pub mode: u16,
     pub name: [u8; 80],
     pub data: RecordData,
     pub checksum: u32,
-    pub reserved2: [u8; 4],
+    pub owner_uid: u16,
+    pub group_gid: u16,
 }
 
 const _: () = assert!(core::mem::size_of::<FileRecord>() == RECORD_SIZE);

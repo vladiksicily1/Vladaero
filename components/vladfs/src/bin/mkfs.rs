@@ -54,11 +54,12 @@ impl VladFsBuilder {
             modified_time: now,
             extent_count: 0,
             name_len: 7,
-            reserved1: 0,
+            mode: 0o444,
             name: [0; 80],
             data: RecordData { resident: [0; RESIDENT_DATA_CAPACITY] },
             checksum: 0,
-            reserved2: [0; 4],
+            owner_uid: 0,
+            group_gid: 0,
         };
         rec0.name[..7].copy_from_slice(b"$Volume");
         records.push(rec0);
@@ -75,7 +76,7 @@ impl VladFsBuilder {
             modified_time: now,
             extent_count: 1,
             name_len: 7,
-            reserved1: 0,
+            mode: 0o444,
             name: [0; 80],
             data: RecordData {
                 extents: [Extent {
@@ -85,7 +86,8 @@ impl VladFsBuilder {
                 }; MAX_EXTENTS],
             },
             checksum: 0,
-            reserved2: [0; 4],
+            owner_uid: 0,
+            group_gid: 0,
         };
         rec1.name[..7].copy_from_slice(b"$Bitmap");
         records.push(rec1);
@@ -102,11 +104,12 @@ impl VladFsBuilder {
             modified_time: now,
             extent_count: 0,
             name_len: 1,
-            reserved1: 0,
+            mode: 0o755,
             name: [0; 80],
             data: RecordData { resident: [0; RESIDENT_DATA_CAPACITY] },
             checksum: 0,
-            reserved2: [0; 4],
+            owner_uid: 0,
+            group_gid: 0,
         };
         rec2.name[0] = b'/';
         records.push(rec2);
@@ -143,22 +146,30 @@ impl VladFsBuilder {
             .unwrap_or_default()
             .as_secs();
 
+        let is_system = name.ends_with(".sys") || name.ends_with(".vex") || name.ends_with(".ini") || name.ends_with(".cfg");
+        let (owner_uid, group_gid, mode) = if is_system {
+            (0, 0, if name.ends_with(".vex") { 0o755 } else { 0o644 })
+        } else {
+            (1000, 1000, 0o644)
+        };
+
         let mut rec = FileRecord {
             magic: RECORD_MAGIC_FILE,
             record_id,
             parent_id,
-            flags: FLAG_ACTIVE,
+            flags: FLAG_ACTIVE | (if is_system { FLAG_SYSTEM } else { 0 }),
             file_size: content.len() as u64,
             allocated_size: 0,
             creation_time: now,
             modified_time: now,
             extent_count: 0,
             name_len: name.len().min(80) as u16,
-            reserved1: 0,
+            mode,
             name: [0; 80],
             data: RecordData { resident: [0; RESIDENT_DATA_CAPACITY] },
             checksum: 0,
-            reserved2: [0; 4],
+            owner_uid,
+            group_gid,
         };
         let nbytes = name.as_bytes();
         rec.name[..nbytes.len().min(80)].copy_from_slice(&nbytes[..nbytes.len().min(80)]);
@@ -201,22 +212,26 @@ impl VladFsBuilder {
             .unwrap_or_default()
             .as_secs();
 
+        let is_system_dir = name.eq_ignore_ascii_case("System32") || name.eq_ignore_ascii_case("VladOS") || name.eq_ignore_ascii_case("drivers") || name.eq_ignore_ascii_case("config");
+        let (owner_uid, group_gid) = if is_system_dir { (0, 0) } else { (1000, 1000) };
+
         let mut rec = FileRecord {
             magic: RECORD_MAGIC_DIR,
             record_id,
             parent_id,
-            flags: FLAG_ACTIVE | FLAG_DIRECTORY | FLAG_RESIDENT,
+            flags: FLAG_ACTIVE | FLAG_DIRECTORY | FLAG_RESIDENT | (if is_system_dir { FLAG_SYSTEM } else { 0 }),
             file_size: 0,
             allocated_size: 0,
             creation_time: now,
             modified_time: now,
             extent_count: 0,
             name_len: name.len().min(80) as u16,
-            reserved1: 0,
+            mode: 0o755,
             name: [0; 80],
             data: RecordData { resident: [0; RESIDENT_DATA_CAPACITY] },
             checksum: 0,
-            reserved2: [0; 4],
+            owner_uid,
+            group_gid,
         };
         let nbytes = name.as_bytes();
         rec.name[..nbytes.len().min(80)].copy_from_slice(&nbytes[..nbytes.len().min(80)]);

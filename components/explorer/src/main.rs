@@ -121,6 +121,200 @@ unsafe fn sys_vfs_read(path: &str, buf: &mut [u8]) -> usize {
     ret
 }
 
+const SYS_VLADOS_VFS_LIST: usize = 0x564C;
+
+#[inline(always)]
+unsafe fn sys_vfs_list(path: &str, buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_LIST => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") buf.as_mut_ptr() as usize,
+        in("r10") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+const SYS_VLADOS_VFS_WRITE: usize  = 0x5647;
+const SYS_VLADOS_VFS_MKDIR: usize  = 0x5648;
+const SYS_VLADOS_VFS_UNLINK: usize = 0x5649;
+const SYS_VLADOS_VFS_RENAME: usize = 0x564A;
+const SYS_VLADOS_VFS_CHMOD: usize  = 0x564E;
+const SYS_VLADOS_WHOAMI: usize     = 0x5650;
+const SYS_VLADOS_SU: usize         = 0x5651;
+const SYS_VLADOS_DRIVES: usize     = 0x5652;
+
+#[inline(always)]
+unsafe fn sys_vfs_write(path: &str, data: &[u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_WRITE => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") data.as_ptr() as usize,
+        in("r10") data.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_mkdir(path: &str) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_MKDIR => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_unlink(path: &str) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_UNLINK => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_rename(old_path: &str, new_path: &str) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_RENAME => ret,
+        in("rdi") old_path.as_ptr() as usize,
+        in("rsi") old_path.len(),
+        in("rdx") new_path.as_ptr() as usize,
+        in("r10") new_path.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_vfs_chmod(path: &str, mode: usize, flags: usize) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_VFS_CHMOD => ret,
+        in("rdi") path.as_ptr() as usize,
+        in("rsi") path.len(),
+        in("rdx") mode,
+        in("r10") flags,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_whoami(buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_WHOAMI => ret,
+        in("rdi") buf.as_mut_ptr() as usize,
+        in("rsi") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_su(uid: usize) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_SU => ret,
+        in("rdi") uid,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+#[inline(always)]
+unsafe fn sys_drives(buf: &mut [u8]) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_VLADOS_DRIVES => ret,
+        in("rdi") buf.as_mut_ptr() as usize,
+        in("rsi") buf.len(),
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+static mut TERM_EXEC_BUF: [u8; 4096] = [0u8; 4096];
+
+pub struct FileExplorerState {
+    pub open: bool,
+    pub x: usize,
+    pub y: usize,
+    pub w: usize,
+    pub h: usize,
+    pub view_mode: usize, // 0 = This PC, 1 = Directory
+    pub current_path: [u8; 128],
+    pub current_path_len: usize,
+}
+
+impl FileExplorerState {
+    pub fn new() -> Self {
+        let mut s = Self {
+            open: true,
+            x: 200,
+            y: 45,
+            w: 780,
+            h: 510,
+            view_mode: 0,
+            current_path: [0u8; 128],
+            current_path_len: 0,
+        };
+        s.set_path("This PC");
+        s
+    }
+
+    pub fn set_path(&mut self, path: &str) {
+        let bytes = path.as_bytes();
+        let len = bytes.len().min(128);
+        self.current_path[..len].copy_from_slice(&bytes[..len]);
+        self.current_path_len = len;
+    }
+
+    pub fn path_str(&self) -> &str {
+        core::str::from_utf8(&self.current_path[..self.current_path_len]).unwrap_or("This PC")
+    }
+}
+
 static mut ACTIVE_FONT: [u8; 16384] = [0u8; 16384];
 static mut FONT_LOADED_FROM_VFS: bool = false;
 
@@ -334,7 +528,7 @@ impl Gfx {
         }
     }
 
-    fn draw_taskbar(&self, start_menu_open: bool) {
+    fn draw_taskbar(&self, start_menu_open: bool, cmd_open: bool, explorer_open: bool) {
         let tb_h = 40;
         let tb_y = self.height.saturating_sub(tb_h);
 
@@ -359,16 +553,25 @@ impl Gfx {
         self.draw_rect_outline(54, tb_y + 5, 170, 30, 0x2D333C);
         self.draw_text(64, tb_y + 12, "Search VladOS...", 0x6E7684, 0x1C2026);
 
-        // CMD Taskbar Button (Active running application)
-        self.fill_rect(232, tb_y + 3, 44, 34, 0x1D222A);
+        // CMD Taskbar Button
+        let cmd_bg = if cmd_open { 0x1D222A } else { 0x161A20 };
+        self.fill_rect(232, tb_y + 3, 44, 34, cmd_bg);
         self.draw_rect_outline(232, tb_y + 3, 44, 34, 0x2D333C);
-        self.draw_text(244, tb_y + 12, ">_", 0x00B7C3, 0x1D222A);
-        // Active blue underline indicator
-        self.fill_rect(236, self.height - 2, 36, 2, 0x0078D7);
+        self.draw_text(244, tb_y + 12, ">_", 0x00B7C3, cmd_bg);
+        if cmd_open {
+            self.fill_rect(236, self.height - 2, 36, 2, 0x0078D7);
+        }
 
-        // Explorer Taskbar Button
-        self.fill_rect(282, tb_y + 3, 44, 34, 0x161A20);
-        self.draw_text(294, tb_y + 12, "[]", 0xEAA300, 0x161A20);
+        // Explorer Taskbar Button (Yellow Folder Icon)
+        let exp_bg = if explorer_open { 0x1D222A } else { 0x161A20 };
+        self.fill_rect(282, tb_y + 3, 44, 34, exp_bg);
+        self.draw_rect_outline(282, tb_y + 3, 44, 34, 0x2D333C);
+        self.fill_rect(294, tb_y + 12, 18, 14, 0xFFC83B);
+        self.fill_rect(296, tb_y + 10, 7, 2, 0xFFC83B);
+        self.fill_rect(298, tb_y + 14, 10, 8, 0x0078D7);
+        if explorer_open {
+            self.fill_rect(286, self.height - 2, 36, 2, 0x0078D7);
+        }
 
         // System Tray on right
         self.draw_text(self.width - 180, tb_y + 12, "RUS", 0xA0A6B2, 0x101418);
@@ -491,6 +694,237 @@ impl Gfx {
 
         // Dark Terminal Client Area
         self.fill_rect(wx + 2, wy + 33, ww - 4, wh - 35, 0x0C0C0C);
+    }
+
+    fn draw_file_explorer(&self, fe: &FileExplorerState) {
+        if !fe.open {
+            return;
+        }
+        let wx = fe.x;
+        let wy = fe.y;
+        let ww = fe.w;
+        let wh = fe.h;
+
+        // 1. Accent Window Border
+        self.draw_rect_outline(wx, wy, ww, wh, 0x0078D7);
+
+        // 2. Title Bar (Height: 32px)
+        self.fill_rect(wx + 1, wy + 1, ww - 2, 31, 0x1F1F1F);
+        // Yellow Folder Icon
+        self.fill_rect(wx + 12, wy + 9, 16, 14, 0xFFC83B);
+        self.fill_rect(wx + 14, wy + 7, 6, 2, 0xFFC83B);
+        // Title Text
+        let title = if fe.view_mode == 0 {
+            "File Explorer - This PC"
+        } else if fe.path_str().starts_with("C:") || fe.path_str().starts_with('/') {
+            "File Explorer - Local Disk (C:)"
+        } else if fe.path_str().starts_with("D:") {
+            "File Explorer - Data Drive (D:)"
+        } else {
+            "File Explorer - CD Drive (E:)"
+        };
+        self.draw_text(wx + 36, wy + 8, title, 0xFFFFFF, 0x1F1F1F);
+
+        // Window Controls (Minimize, Maximize, Close)
+        let ctrl_start = wx + ww.saturating_sub(138);
+        self.fill_rect(ctrl_start, wy + 1, 46, 31, 0x1F1F1F);
+        self.fill_rect(ctrl_start + 18, wy + 18, 10, 2, 0xD0D0D0); // -
+
+        self.fill_rect(ctrl_start + 46, wy + 1, 46, 31, 0x1F1F1F);
+        self.draw_rect_outline(ctrl_start + 63, wy + 11, 12, 12, 0xD0D0D0); // []
+
+        self.fill_rect(ctrl_start + 92, wy + 1, 45, 31, 0xE81123);
+        self.draw_text(ctrl_start + 110, wy + 8, "X", 0xFFFFFF, 0xE81123); // X
+
+        // 3. Ribbon Toolbar (Height: 32px)
+        self.fill_rect(wx + 1, wy + 32, ww - 2, 32, 0x2B2B2B);
+        self.draw_text(wx + 14, wy + 40, "File   Home   Share   View", 0xE0E0E0, 0x2B2B2B);
+        self.fill_rect(wx + 54, wy + 62, 38, 2, 0x0078D7); // Active tab line
+        self.draw_text(wx + 220, wy + 40, "[+ New folder]  [Delete]  [Properties]", 0x909090, 0x2B2B2B);
+
+        // 4. Address & Search Bar (Height: 34px)
+        self.fill_rect(wx + 1, wy + 64, ww - 2, 34, 0x1F1F1F);
+        // Nav buttons
+        self.draw_text(wx + 12, wy + 72, "<-", 0x0078D7, 0x1F1F1F);
+        self.draw_text(wx + 34, wy + 72, "->", 0x666666, 0x1F1F1F);
+        self.draw_text(wx + 54, wy + 72, "^", 0x0078D7, 0x1F1F1F);
+
+        // Breadcrumb Address Bar
+        let addr_box_w = ww.saturating_sub(260);
+        self.fill_rect(wx + 76, wy + 69, addr_box_w, 24, 0x262626);
+        self.draw_rect_outline(wx + 76, wy + 69, addr_box_w, 24, 0x3D3D3D);
+        let breadcrumb = if fe.view_mode == 0 {
+            "This PC"
+        } else {
+            fe.path_str()
+        };
+        self.draw_text(wx + 84, wy + 73, breadcrumb, 0xCCCCCC, 0x262626);
+
+        // Search Box
+        let search_x = wx + ww.saturating_sub(175);
+        self.fill_rect(search_x, wy + 69, 165, 24, 0x262626);
+        self.draw_rect_outline(search_x, wy + 69, 165, 24, 0x3D3D3D);
+        self.draw_text(search_x + 8, wy + 73, "Search This PC", 0x777777, 0x262626);
+
+        // 5. Client Area Split: Left Sidebar & Right Main
+        let content_y = wy + 98;
+        let content_h = wh.saturating_sub(122);
+        let sidebar_w = 175;
+
+        // --- Left Sidebar (Quick Access & Drive Tree) ---
+        self.fill_rect(wx + 1, content_y, sidebar_w, content_h, 0x181818);
+        self.draw_text(wx + 10, content_y + 10, "> Quick access", 0x0078D7, 0x181818);
+        self.draw_text(wx + 18, content_y + 30, "Desktop", 0xCCCCCC, 0x181818);
+        self.draw_text(wx + 18, content_y + 48, "Downloads", 0xCCCCCC, 0x181818);
+        self.draw_text(wx + 18, content_y + 66, "Documents", 0xCCCCCC, 0x181818);
+        self.fill_rect(wx + 10, content_y + 88, sidebar_w - 20, 1, 0x2A2A2A);
+
+        self.draw_text(wx + 10, content_y + 98, "v This PC", 0x0078D7, 0x181818);
+
+        // Drive C: (VladFS)
+        if fe.view_mode == 1 && fe.path_str().starts_with("C:") {
+            self.fill_rect(wx + 8, content_y + 116, sidebar_w - 16, 20, 0x2E2E2E);
+        }
+        self.draw_text(wx + 18, content_y + 118, "Local Disk (C:)", 0xFFFFFF, 0x181818);
+
+        // Drive D: (FAT32/EXT2)
+        if fe.view_mode == 1 && fe.path_str().starts_with("D:") {
+            self.fill_rect(wx + 8, content_y + 138, sidebar_w - 16, 20, 0x2E2E2E);
+        }
+        self.draw_text(wx + 18, content_y + 140, "Data Drive (D:)", 0xCCCCCC, 0x181818);
+
+        // Drive E: (ISO9660)
+        if fe.view_mode == 1 && fe.path_str().starts_with("E:") {
+            self.fill_rect(wx + 8, content_y + 160, sidebar_w - 16, 20, 0x2E2E2E);
+        }
+        self.draw_text(wx + 18, content_y + 162, "CD Drive (E:)", 0xCCCCCC, 0x181818);
+
+        self.fill_rect(wx + 10, content_y + 186, sidebar_w - 20, 1, 0x2A2A2A);
+        self.draw_text(wx + 10, content_y + 196, "> Network", 0x666666, 0x181818);
+
+        // Sidebar vertical line
+        self.fill_rect(wx + sidebar_w + 1, content_y, 1, content_h, 0x2A2A2A);
+
+        // --- Right Main Pane ---
+        let main_x = wx + sidebar_w + 2;
+        let main_w = ww.saturating_sub(sidebar_w + 4);
+        self.fill_rect(main_x, content_y, main_w, content_h, 0x101010);
+
+        if fe.view_mode == 0 {
+            // "This PC" Mode: Display logical drives with visual progress bars!
+            self.draw_text(main_x + 16, content_y + 12, "Devices and drives (3)", 0x888888, 0x101010);
+            self.fill_rect(main_x + 16, content_y + 30, main_w.saturating_sub(32), 1, 0x222222);
+
+            // Drive C: Card (VladFS)
+            self.fill_rect(main_x + 16, content_y + 40, 260, 68, 0x181818);
+            self.draw_rect_outline(main_x + 16, content_y + 40, 260, 68, 0x2A2A2A);
+            self.fill_rect(main_x + 26, content_y + 50, 28, 28, 0x0078D7);
+            self.draw_text(main_x + 32, content_y + 56, "C:", 0xFFFFFF, 0x0078D7);
+            self.draw_text(main_x + 62, content_y + 46, "Local Disk (C:)", 0xFFFFFF, 0x181818);
+            self.draw_text(main_x + 62, content_y + 62, "VladFS Volume (VLADOS_SYS)", 0x888888, 0x181818);
+            self.fill_rect(main_x + 62, content_y + 80, 190, 8, 0x333333);
+            self.fill_rect(main_x + 62, content_y + 80, 142, 8, 0x0078D7); // 24MB free of 32MB
+            self.draw_text(main_x + 62, content_y + 92, "24.2 MB free of 32.0 MB", 0x777777, 0x181818);
+
+            // Drive D: Card (FAT32/EXT2)
+            self.fill_rect(main_x + 290, content_y + 40, 260, 68, 0x181818);
+            self.draw_rect_outline(main_x + 290, content_y + 40, 260, 68, 0x2A2A2A);
+            self.fill_rect(main_x + 300, content_y + 50, 28, 28, 0x2D7D9A);
+            self.draw_text(main_x + 306, content_y + 56, "D:", 0xFFFFFF, 0x2D7D9A);
+            self.draw_text(main_x + 336, content_y + 46, "Data Drive (D:)", 0xFFFFFF, 0x181818);
+            self.draw_text(main_x + 336, content_y + 62, "FAT32 / EXT2 (DATA_DRIVE)", 0x888888, 0x181818);
+            self.fill_rect(main_x + 336, content_y + 80, 190, 8, 0x333333);
+            self.fill_rect(main_x + 336, content_y + 80, 168, 8, 0x0078D7); // 1.84GB free of 2GB
+            self.draw_text(main_x + 336, content_y + 92, "1.84 GB free of 2.00 GB", 0x777777, 0x181818);
+
+            // Drive E: Card (ISO9660)
+            self.fill_rect(main_x + 16, content_y + 124, 260, 68, 0x181818);
+            self.draw_rect_outline(main_x + 16, content_y + 124, 260, 68, 0x2A2A2A);
+            self.fill_rect(main_x + 26, content_y + 134, 28, 28, 0x777777);
+            self.draw_text(main_x + 32, content_y + 140, "CD", 0xFFFFFF, 0x777777);
+            self.draw_text(main_x + 62, content_y + 126, "CD Drive (E:) VLADOS", 0xFFFFFF, 0x181818);
+            self.draw_text(main_x + 62, content_y + 146, "ISO9660 Optical Media", 0x888888, 0x181818);
+            self.fill_rect(main_x + 62, content_y + 164, 190, 8, 0x333333);
+            self.fill_rect(main_x + 62, content_y + 164, 190, 8, 0x777777);
+            self.draw_text(main_x + 62, content_y + 176, "0 bytes free of 97.0 MB", 0x777777, 0x181818);
+
+            // Folders Section
+            self.draw_text(main_x + 16, content_y + 206, "Folders (4)", 0x888888, 0x101010);
+            self.fill_rect(main_x + 16, content_y + 224, main_w.saturating_sub(32), 1, 0x222222);
+            self.draw_text(main_x + 24, content_y + 236, "Desktop", 0xCCCCCC, 0x101010);
+            self.draw_text(main_x + 150, content_y + 236, "Documents", 0xCCCCCC, 0x101010);
+            self.draw_text(main_x + 290, content_y + 236, "Downloads", 0xCCCCCC, 0x101010);
+            self.draw_text(main_x + 430, content_y + 236, "Pictures", 0xCCCCCC, 0x101010);
+        } else {
+            // Folder Contents View (C:, D:, or E:)
+            self.fill_rect(main_x, content_y, main_w, 22, 0x181818);
+            self.draw_text(main_x + 16, content_y + 4, "Name", 0xAAAAAA, 0x181818);
+            self.draw_text(main_x + 190, content_y + 4, "Type", 0xAAAAAA, 0x181818);
+            self.draw_text(main_x + 310, content_y + 4, "Size", 0xAAAAAA, 0x181818);
+            self.draw_text(main_x + 380, content_y + 4, "Owner", 0xAAAAAA, 0x181818);
+            self.draw_text(main_x + 460, content_y + 4, "Permissions", 0xAAAAAA, 0x181818);
+            self.fill_rect(main_x, content_y + 22, main_w, 1, 0x282828);
+
+            // Read entries via sys_vfs_list
+            static mut EXP_LIST_BUF: [u8; 4096] = [0u8; 4096];
+            #[allow(static_mut_refs)]
+            let n = unsafe { sys_vfs_list(fe.path_str(), &mut EXP_LIST_BUF) };
+            if n > 0 && n <= 4096 {
+                #[allow(static_mut_refs)]
+                if let Ok(list_str) = core::str::from_utf8(unsafe { &EXP_LIST_BUF[..n] }) {
+                    let mut row_y = content_y + 28;
+                    for line in list_str.lines() {
+                        if row_y + 18 > content_y + content_h {
+                            break;
+                        }
+                        let mut it = line.split_ascii_whitespace();
+                        if let (Some(perm), Some(p1)) = (it.next(), it.next()) {
+                            let (is_dir, size, owner, name) = if p1 == "<DIR>" {
+                                (true, it.next().unwrap_or("0"), it.next().unwrap_or("SYSTEM"), it.next().unwrap_or(""))
+                            } else {
+                                (false, p1, it.next().unwrap_or("SYSTEM"), it.next().unwrap_or(""))
+                            };
+
+                            if !name.is_empty() {
+                                let (icon, item_type, name_color) = if is_dir {
+                                    ("[DIR]", "File folder", 0xFFD040)
+                                } else if name.ends_with(".sys") {
+                                    ("[SYS]", "System Driver", 0x60CDFF)
+                                } else if name.ends_with(".vex") {
+                                    ("[VEX]", "Executable", 0x76B9ED)
+                                } else if name.ends_with(".ini") || name.ends_with(".cfg") || name.ends_with(".theme") {
+                                    ("[CFG]", "Config / Theme", 0xCCCCCC)
+                                } else {
+                                    ("[TXT]", "Resource File", 0xEEEEEE)
+                                };
+
+                                self.draw_text(main_x + 16, row_y, icon, name_color, 0x101010);
+                                self.draw_text(main_x + 60, row_y, name, name_color, 0x101010);
+                                self.draw_text(main_x + 190, row_y, item_type, 0x888888, 0x101010);
+                                self.draw_text(main_x + 310, row_y, size, 0x888888, 0x101010);
+                                self.draw_text(main_x + 380, row_y, owner, 0x888888, 0x101010);
+                                self.draw_text(main_x + 460, row_y, perm, 0x666666, 0x101010);
+
+                                row_y += 20;
+                            }
+                        }
+                    }
+                }
+            } else {
+                self.draw_text(main_x + 30, content_y + 40, "This folder is empty or not accessible.", 0x777777, 0x101010);
+            }
+        }
+
+        // 6. Status Bar (Height: 24px)
+        let status_y = wy + wh.saturating_sub(24);
+        self.fill_rect(wx + 1, status_y, ww - 2, 23, 0x181818);
+        self.fill_rect(wx + 1, status_y, ww - 2, 1, 0x282828);
+        let status_msg = if fe.view_mode == 0 {
+            "3 drives available | VladFS, FAT32, ISO9660 active | System Healthy"
+        } else {
+            "Folder View Active | RBAC Access: Authenticated (Vlad / Administrator)"
+        };
+        self.draw_text(wx + 16, status_y + 4, status_msg, 0x888888, 0x181818);
     }
 }
 
@@ -716,7 +1150,13 @@ impl TerminalState {
         gfx.fill_rect(cursor_x, curr_y, 8, 16, 0x0078D7);
     }
 
-    fn execute_command(&mut self, gfx: &Gfx, start_menu_open: &mut bool) {
+    fn execute_command(
+        &mut self,
+        gfx: &Gfx,
+        start_menu_open: &mut bool,
+        window_open: &mut bool,
+        fe: &mut FileExplorerState,
+    ) {
         let len = self.input_len;
         if len == 0 {
             self.add_line("C:\\VladOS\\System32> ");
@@ -739,49 +1179,222 @@ impl TerminalState {
         if let Ok(cmd) = core::str::from_utf8(&cmd_bytes[..len]) {
             let cmd = cmd.trim();
             if eq_ignore_ascii_case(cmd, "help") {
-                self.add_line("For more information on a specific command, type HELP command-name");
-                self.add_line("CLS        Clears the terminal screen.");
-                self.add_line("DIR        Displays a list of files and subdirectories.");
-                self.add_line("ECHO       Displays messages.");
-                self.add_line("EXPLORER   Refreshes the Windows 10 Desktop shell.");
-                self.add_line("HELP       Provides Help information for VladOS commands.");
-                self.add_line("MOUSE      Moves or clicks Windows 10 mouse (e.g. MOUSE 20 780).");
-                self.add_line("START      Toggles the Windows 10 Start Menu.");
-                self.add_line("SYSINFO    Displays machine and operating system info.");
-                self.add_line("VER        Displays VladOS version.");
+                self.add_line("VladOS Command Prompt Reference:");
+                self.add_line("DIR [path]   - List directory (VladFS C:, FAT32 D:, ISO E:)");
+                self.add_line("DRIVES       - List all mounted volumes");
+                self.add_line("WHOAMI       - Display current user context, SID and privileges");
+                self.add_line("NET USER     - List system security accounts");
+                self.add_line("SU <user>    - Switch user (SYSTEM, Vlad, User, Guest)");
+                self.add_line("TYPE <file>  - Display contents of a text file");
+                self.add_line("ECHO txt [> f]- Print text or write to file");
+                self.add_line("MKDIR <path> - Create a new directory");
+                self.add_line("DEL <path>   - Delete a file");
+                self.add_line("REN <o> <n>  - Rename file or directory");
+                self.add_line("CHMOD <m> <p>- Change file permissions");
+                self.add_line("EXPLORER     - Toggle / bring File Explorer to front");
+                self.add_line("MENU         - Toggle Start Menu");
+                self.add_line("SYSINFO      - Hardware & OS specifications");
+                self.add_line("CLS          - Clear screen");
+                self.add_line("VER          - Display OS version");
+                self.add_line("EXIT         - Close CMD window");
             } else if eq_ignore_ascii_case(cmd, "ver") {
-                self.add_line("VladOS [Version 10.0.22000.1] - 64-bit Hybrid Kernel");
+                self.add_line("VladOS [Version 10.0.19045.3803]");
+                self.add_line("(c) 2026 Vlad Inc. All rights reserved.");
             } else if eq_ignore_ascii_case(cmd, "cls") {
                 self.history_count = 0;
+            } else if eq_ignore_ascii_case(cmd, "exit") {
+                *window_open = false;
+                let wx = if gfx.width >= 1024 { 356 } else { 16 };
+                let wy = 36;
+                let ww = gfx.width.saturating_sub(wx + 16);
+                let wh = gfx.height.saturating_sub(wy + 48);
+                gfx.redraw_wallpaper_rect(wx, wy, ww, wh);
+                if fe.open {
+                    gfx.draw_file_explorer(fe);
+                }
+                gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
+                self.add_line("[CMD Window Closed]");
+            } else if eq_ignore_ascii_case(cmd, "whoami") {
+                #[allow(static_mut_refs)]
+                let n = unsafe { sys_whoami(&mut TERM_EXEC_BUF) };
+                if n > 0 && n <= 4096 {
+                    #[allow(static_mut_refs)]
+                    if let Ok(s) = core::str::from_utf8(unsafe { &TERM_EXEC_BUF[..n] }) {
+                        for line in s.lines() {
+                            self.add_line(line);
+                        }
+                    }
+                }
+            } else if eq_ignore_ascii_case(cmd, "net user") {
+                self.add_line("User Accounts for \\\\VLADOS-PC");
+                self.add_line("--------------------------------------------------");
+                self.add_line("SYSTEM                   Vlad                     User");
+                self.add_line("Guest                    DefaultAccount");
+                self.add_line("The command completed successfully.");
+            } else if starts_with_ignore_case(cmd, "su ") || starts_with_ignore_case(cmd, "runas ") {
+                let arg = if starts_with_ignore_case(cmd, "su ") {
+                    cmd[3..].trim()
+                } else {
+                    cmd[6..].trim()
+                };
+                let uid = if eq_ignore_ascii_case(arg, "system") || eq_ignore_ascii_case(arg, "root") || arg == "0" {
+                    0
+                } else if eq_ignore_ascii_case(arg, "vlad") || eq_ignore_ascii_case(arg, "admin") || arg == "1000" {
+                    1000
+                } else if eq_ignore_ascii_case(arg, "user") || arg == "1001" {
+                    1001
+                } else if eq_ignore_ascii_case(arg, "guest") || arg == "1002" {
+                    1002
+                } else {
+                    usize::MAX
+                };
+
+                if uid == usize::MAX {
+                    self.add_line("Account not found. Available: SYSTEM, Vlad, User, Guest");
+                } else {
+                    let ret = unsafe { sys_su(uid) };
+                    if ret == 0 {
+                        let mut msg_buf = [0u8; 64];
+                        let prefix = b"Switched security context to: ";
+                        msg_buf[..prefix.len()].copy_from_slice(prefix);
+                        let arg_len = arg.len().min(64 - prefix.len());
+                        msg_buf[prefix.len()..prefix.len() + arg_len].copy_from_slice(&arg.as_bytes()[..arg_len]);
+                        if let Ok(m) = core::str::from_utf8(&msg_buf[..prefix.len() + arg_len]) {
+                            self.add_line(m);
+                        }
+                    } else {
+                        self.add_line("Failed to switch user: Permission Denied");
+                    }
+                }
+            } else if eq_ignore_ascii_case(cmd, "drives") || eq_ignore_ascii_case(cmd, "wmic logicaldisk") {
+                self.add_line("Mounted Logical Drives & Volumes:");
+                self.add_line("--------------------------------------------------");
+                #[allow(static_mut_refs)]
+                let n = unsafe { sys_drives(&mut TERM_EXEC_BUF) };
+                if n > 0 && n <= 4096 {
+                    #[allow(static_mut_refs)]
+                    if let Ok(s) = core::str::from_utf8(unsafe { &TERM_EXEC_BUF[..n] }) {
+                        for line in s.lines() {
+                            self.add_line(line);
+                        }
+                    }
+                }
             } else if eq_ignore_ascii_case(cmd, "sysinfo") {
                 self.add_line("Host Name:                 VLADOS-PC");
                 self.add_line("OS Name:                   VladOS 10 Professional");
-                self.add_line("OS Version:                1.0.0 Build 2026.09.06");
-                self.add_line("Architecture:              x86_64 Long Mode (64-bit)");
-                self.add_line("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
-                self.add_line("Start Menu:                Active (Pinned: CMD, SysInfo, Explorer)");
-                self.add_line("Mouse Subsystem:           USB Tablet / PS/2 Active (Windows 10 Aero)");
-                self.add_line("Display:                   1280x800x32 Linear GOP Framebuffer");
-                self.add_line("Root Filesystem:           VladFS (Volume: VLADOS_SYS)");
-                let font_source = if unsafe { FONT_LOADED_FROM_VFS } {
-                    "Font Subsystem:            VladFS (/VladOS/Resources/Fonts/CascadiaMono.fnt)"
+                self.add_line("OS Version:                10.0.19045 N/A Build 19045");
+                self.add_line("System Manufacturer:       Vlad Corporation");
+                self.add_line("System Model:              VladBook Pro x86_64");
+                self.add_line("Processor(s):              1 Processor(s) Installed. [x86_64 Family]");
+                self.add_line("BIOS Version:              EDK2 / OVMF UEFI 2.70");
+                self.add_line("Mouse Subsystem:           USB Tablet + PS/2 Hardware Sync");
+                self.add_line("Storage / VFS:             VladFS + FAT32 (D:) + ISO9660 (E:)");
+            } else if eq_ignore_ascii_case(cmd, "dir") || starts_with_ignore_case(cmd, "dir ") {
+                let dir_target = if starts_with_ignore_case(cmd, "dir ") {
+                    cmd[4..].trim()
                 } else {
-                    "Font Subsystem:            Builtin Embedded Fallback"
+                    "C:\\"
                 };
-                self.add_line(font_source);
-                self.add_line("Cloud Portal:              https://vladinc.ru/vlados/");
-            } else if eq_ignore_ascii_case(cmd, "dir") {
-                self.add_line(" Volume in drive C is VLADOS_SYS");
-                self.add_line(" Directory of C:\\VladOS\\System32");
+                self.add_line(" Directory of:");
+                self.add_line(dir_target);
                 self.add_line("");
-                self.add_line("09/05/2026  01:00 PM    <DIR>          config");
-                self.add_line("09/05/2026  01:00 PM    <DIR>          drivers");
-                self.add_line("09/05/2026  01:00 PM             1,350 vladinit.vex");
-                self.add_line("09/05/2026  01:00 PM             2,840 explorer.vex");
-                self.add_line("09/05/2026  01:00 PM             2,180 cmd.vex");
-                self.add_line("               3 File(s)          6,370 bytes");
-                self.add_line("               4 Dir(s)      24,117,248 bytes free");
-            } else if eq_ignore_ascii_case(cmd, "start") || eq_ignore_ascii_case(cmd, "menu") {
+                #[allow(static_mut_refs)]
+                let n = unsafe { sys_vfs_list(dir_target, &mut TERM_EXEC_BUF) };
+                if n > 0 && n <= 4096 {
+                    #[allow(static_mut_refs)]
+                    if let Ok(s) = core::str::from_utf8(unsafe { &TERM_EXEC_BUF[..n] }) {
+                        for line in s.lines() {
+                            self.add_line(line);
+                        }
+                    }
+                } else {
+                    self.add_line("File Not Found or Access Denied.");
+                }
+            } else if starts_with_ignore_case(cmd, "type ") {
+                let p = cmd[5..].trim();
+                #[allow(static_mut_refs)]
+                let n = unsafe { sys_vfs_read(p, &mut TERM_EXEC_BUF) };
+                if n > 0 && n <= 4096 {
+                    #[allow(static_mut_refs)]
+                    if let Ok(s) = core::str::from_utf8(unsafe { &TERM_EXEC_BUF[..n] }) {
+                        for line in s.lines() {
+                            self.add_line(line);
+                        }
+                    }
+                } else {
+                    self.add_line("The system cannot find the file specified or Access Denied.");
+                }
+            } else if starts_with_ignore_case(cmd, "mkdir ") || starts_with_ignore_case(cmd, "md ") {
+                let p = if starts_with_ignore_case(cmd, "mkdir ") {
+                    cmd[6..].trim()
+                } else {
+                    cmd[3..].trim()
+                };
+                let ret = unsafe { sys_vfs_mkdir(p) };
+                if ret > 0 {
+                    self.add_line("A subdirectory was created successfully.");
+                    if fe.open {
+                        gfx.draw_file_explorer(fe);
+                    }
+                } else {
+                    self.add_line("A subdirectory or file already exists or Access Denied.");
+                }
+            } else if starts_with_ignore_case(cmd, "del ") || starts_with_ignore_case(cmd, "rm ") {
+                let p = if starts_with_ignore_case(cmd, "del ") {
+                    cmd[4..].trim()
+                } else {
+                    cmd[3..].trim()
+                };
+                let ret = unsafe { sys_vfs_unlink(p) };
+                if ret == 0 {
+                    self.add_line("File deleted successfully.");
+                    if fe.open {
+                        gfx.draw_file_explorer(fe);
+                    }
+                } else {
+                    self.add_line("Could Not Find or Access Denied.");
+                }
+            } else if starts_with_ignore_case(cmd, "ren ") {
+                let parts = cmd[4..].trim();
+                if let Some(idx) = parts.find(' ') {
+                    let old_p = parts[..idx].trim();
+                    let new_p = parts[idx + 1..].trim();
+                    let ret = unsafe { sys_vfs_rename(old_p, new_p) };
+                    if ret == 0 {
+                        self.add_line("File renamed successfully.");
+                        if fe.open {
+                            gfx.draw_file_explorer(fe);
+                        }
+                    } else {
+                        self.add_line("The duplicate file name exists, or file cannot be found.");
+                    }
+                } else {
+                    self.add_line("Syntax: REN <old_path> <new_name>");
+                }
+            } else if starts_with_ignore_case(cmd, "chmod ") {
+                let parts = cmd[6..].trim();
+                if let Some(idx) = parts.find(' ') {
+                    let mode_str = parts[..idx].trim();
+                    let path = parts[idx + 1..].trim();
+                    let mut mode = 0usize;
+                    for b in mode_str.bytes() {
+                        if b >= b'0' && b <= b'7' {
+                            mode = (mode << 3) | (b - b'0') as usize;
+                        }
+                    }
+                    let ret = unsafe { sys_vfs_chmod(path, mode, 0) };
+                    if ret == 0 {
+                        self.add_line("Permissions updated successfully.");
+                        if fe.open {
+                            gfx.draw_file_explorer(fe);
+                        }
+                    } else {
+                        self.add_line("Failed to update permissions (Access Denied).");
+                    }
+                } else {
+                    self.add_line("Syntax: CHMOD <octal_mode> <path>");
+                }
+            } else if eq_ignore_ascii_case(cmd, "menu") {
                 *start_menu_open = !*start_menu_open;
                 if *start_menu_open {
                     gfx.draw_start_menu();
@@ -793,21 +1406,33 @@ impl TerminalState {
                     gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
                     self.add_line("[Start Menu closed]");
                 }
-                gfx.draw_taskbar(*start_menu_open);
+                gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
             } else if eq_ignore_ascii_case(cmd, "explorer") {
-                gfx.draw_desktop();
-                gfx.draw_cmd_window();
-                gfx.draw_taskbar(*start_menu_open);
-                if *start_menu_open {
-                    gfx.draw_start_menu();
-                }
-                self.add_line("[Desktop shell redrawn]");
+                fe.open = true;
+                gfx.draw_file_explorer(fe);
+                gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
+                self.add_line("[File Explorer opened]");
             } else if starts_with_ignore_case(cmd, "echo ") {
-                let mut echo_buf = [0u8; 128];
-                let echo_len = cmd[5..].len().min(128);
-                echo_buf[..echo_len].copy_from_slice(cmd[5..][..echo_len].as_bytes());
-                if let Ok(echo_str) = core::str::from_utf8(&echo_buf[..echo_len]) {
-                    self.add_line(echo_str);
+                let rest = cmd[5..].trim();
+                if let Some(idx) = rest.find('>') {
+                    let text = rest[..idx].trim();
+                    let path = rest[idx + 1..].trim();
+                    let ret = unsafe { sys_vfs_write(path, text.as_bytes()) };
+                    if ret > 0 {
+                        self.add_line("File written successfully.");
+                        if fe.open {
+                            gfx.draw_file_explorer(fe);
+                        }
+                    } else {
+                        self.add_line("Access is denied or volume is write-protected.");
+                    }
+                } else {
+                    let mut echo_buf = [0u8; 128];
+                    let echo_len = rest.len().min(128);
+                    echo_buf[..echo_len].copy_from_slice(rest.as_bytes()[..echo_len].as_ref());
+                    if let Ok(echo_str) = core::str::from_utf8(&echo_buf[..echo_len]) {
+                        self.add_line(echo_str);
+                    }
                 }
             } else {
                 self.add_line("Command not recognized. Type HELP for command list.");
@@ -817,11 +1442,13 @@ impl TerminalState {
     }
 }
 
+
 fn handle_mouse_click(
     gfx: &Gfx,
     term: &mut TerminalState,
     start_menu_open: &mut bool,
     window_open: &mut bool,
+    fe: &mut FileExplorerState,
     mx: usize,
     my: usize,
 ) {
@@ -839,15 +1466,18 @@ fn handle_mouse_click(
             gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
             term.add_line("[Mouse Click: Start Menu closed]");
         }
-        gfx.draw_taskbar(*start_menu_open);
+        gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
         if *window_open {
             term.render(gfx);
+        }
+        if fe.open {
+            gfx.draw_file_explorer(fe);
         }
         return;
     }
 
-    // 2. Taskbar App Icon (>_ CMD) (x: 180..220, y: 760..800)
-    if my >= tb_y && mx >= 180 && mx <= 220 {
+    // 2. Taskbar App Icon (>_ CMD) (x: 230..276, y: 760..800)
+    if my >= tb_y && mx >= 230 && mx <= 276 {
         *window_open = !*window_open;
         if *window_open {
             gfx.draw_cmd_window();
@@ -860,6 +1490,211 @@ fn handle_mouse_click(
             let wh = gfx.height.saturating_sub(wy + 48);
             gfx.redraw_wallpaper_rect(wx, wy, ww, wh);
             term.add_line("[Mouse Click: CMD window minimized]");
+        }
+        if fe.open {
+            gfx.draw_file_explorer(fe);
+        }
+        gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
+        return;
+    }
+
+    // 2b. Taskbar App Icon (File Explorer []) (x: 280..326, y: 760..800)
+    if my >= tb_y && mx >= 280 && mx <= 326 {
+        fe.open = !fe.open;
+        if fe.open {
+            gfx.draw_file_explorer(fe);
+            term.add_line("[Mouse Click: File Explorer opened]");
+        } else {
+            gfx.redraw_wallpaper_rect(fe.x, fe.y, fe.w, fe.h);
+            if *window_open {
+                gfx.draw_cmd_window();
+                term.render(gfx);
+            }
+            term.add_line("[Mouse Click: File Explorer minimized]");
+        }
+        gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
+        return;
+    }
+
+    // 2c. File Explorer Window Clicks (if open)
+    if fe.open && mx >= fe.x && mx <= fe.x + fe.w && my >= fe.y && my <= fe.y + fe.h {
+        // Close Button [X]
+        if mx >= fe.x + fe.w - 45 && my <= fe.y + 32 {
+            fe.open = false;
+            gfx.redraw_wallpaper_rect(fe.x, fe.y, fe.w, fe.h);
+            if *window_open {
+                gfx.draw_cmd_window();
+                term.render(gfx);
+            }
+            gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
+            term.add_line("[Mouse Click: File Explorer closed]");
+            return;
+        }
+
+        // Ribbon Buttons: [+ New folder] [Delete] [Properties]
+        if my >= fe.y + 32 && my <= fe.y + 64 {
+            if mx >= fe.x + 215 && mx <= fe.x + 325 {
+                let cur = fe.path_str();
+                if cur.eq_ignore_ascii_case("C:\\VladOS") {
+                    unsafe { sys_vfs_mkdir("C:\\VladOS\\NewFolder") };
+                } else if cur.eq_ignore_ascii_case("C:\\VladOS\\System32") {
+                    unsafe { sys_vfs_mkdir("C:\\VladOS\\System32\\NewFolder") };
+                } else {
+                    unsafe { sys_vfs_mkdir("C:\\NewFolder") };
+                }
+                term.add_line("[Ribbon: Created directory NewFolder]");
+                gfx.draw_file_explorer(fe);
+                if *window_open {
+                    term.render(gfx);
+                }
+                return;
+            } else if mx >= fe.x + 335 && mx <= fe.x + 405 {
+                term.add_line("[Ribbon: [Delete] action - select an item to delete]");
+                if *window_open {
+                    term.render(gfx);
+                }
+                return;
+            } else if mx >= fe.x + 415 && mx <= fe.x + 515 {
+                let cur = fe.path_str();
+                term.add_line("--- Volume / Path Properties ---");
+                if cur.starts_with("C:") || cur.starts_with('/') {
+                    term.add_line("Location: C: (VladFS Primary System Volume)");
+                    term.add_line("Capacity: 32.0 MB (24.2 MB free) | Format: VladFS v1.0");
+                    term.add_line("Security: SYSTEM / Administrators (Full Access)");
+                } else if cur.starts_with("D:") {
+                    term.add_line("Location: D: (Secondary Data Volume)");
+                    term.add_line("Capacity: 2.00 GB (1.84 GB free) | Format: FAT32 / EXT2");
+                } else {
+                    term.add_line("Location: E: (VladOS Installation Media)");
+                    term.add_line("Capacity: 97.0 MB (Read-Only) | Format: ISO9660");
+                }
+                if *window_open {
+                    term.render(gfx);
+                }
+                return;
+            }
+        }
+
+        // Back Arrow [<-] or Up [^]
+        if mx >= fe.x + 8 && mx <= fe.x + 50 && my >= fe.y + 68 && my <= fe.y + 94 {
+            let cur = fe.path_str();
+            if cur.eq_ignore_ascii_case("C:\\VladOS\\System32\\drivers") {
+                fe.set_path("C:\\VladOS\\System32");
+            } else if cur.eq_ignore_ascii_case("C:\\VladOS\\System32") || cur.eq_ignore_ascii_case("C:\\VladOS\\Resources") {
+                fe.set_path("C:\\VladOS");
+            } else {
+                fe.view_mode = 0;
+                fe.set_path("This PC");
+            }
+            gfx.draw_file_explorer(fe);
+            return;
+        }
+
+        // Sidebar items
+        let sidebar_top = fe.y + 98;
+        if mx <= fe.x + 175 {
+            // Quick Access Desktop
+            if my >= sidebar_top + 22 && my <= sidebar_top + 38 {
+                fe.view_mode = 1;
+                fe.set_path("C:\\Users\\Vlad\\Desktop");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // Quick Access Downloads
+            if my >= sidebar_top + 39 && my <= sidebar_top + 54 {
+                fe.view_mode = 1;
+                fe.set_path("C:\\Users\\Vlad\\Downloads");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // Quick Access Documents
+            if my >= sidebar_top + 55 && my <= sidebar_top + 72 {
+                fe.view_mode = 1;
+                fe.set_path("C:\\Users\\Vlad\\Documents");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // "v This PC"
+            if my >= sidebar_top + 80 && my <= sidebar_top + 98 {
+                fe.view_mode = 0;
+                fe.set_path("This PC");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // Local Disk (C:)
+            if my >= sidebar_top + 99 && my <= sidebar_top + 116 {
+                fe.view_mode = 1;
+                fe.set_path("C:\\VladOS");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // Data Drive (D:)
+            if my >= sidebar_top + 117 && my <= sidebar_top + 134 {
+                fe.view_mode = 1;
+                fe.set_path("D:\\");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // CD Drive (E:)
+            if my >= sidebar_top + 135 && my <= sidebar_top + 155 {
+                fe.view_mode = 1;
+                fe.set_path("E:\\");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+        }
+
+        // Main Pane Drives (when in This PC mode)
+        if fe.view_mode == 0 {
+            let main_x = fe.x + 175;
+            // Drive C Card
+            if mx >= main_x + 16 && mx <= main_x + 276 && my >= sidebar_top + 40 && my <= sidebar_top + 108 {
+                fe.view_mode = 1;
+                fe.set_path("C:\\VladOS");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // Drive D Card
+            if mx >= main_x + 290 && mx <= main_x + 550 && my >= sidebar_top + 40 && my <= sidebar_top + 108 {
+                fe.view_mode = 1;
+                fe.set_path("D:\\");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+            // Drive E Card
+            if mx >= main_x + 16 && mx <= main_x + 276 && my >= sidebar_top + 124 && my <= sidebar_top + 192 {
+                fe.view_mode = 1;
+                fe.set_path("E:\\");
+                gfx.draw_file_explorer(fe);
+                return;
+            }
+        } else {
+            // In Directory View (fe.view_mode == 1)
+            let main_x = fe.x + 175;
+            if mx >= main_x && my >= sidebar_top + 28 {
+                let row_idx = (my - (sidebar_top + 28)) / 18;
+                let cur = fe.path_str();
+                if cur.eq_ignore_ascii_case("C:\\VladOS") {
+                    if row_idx == 0 || row_idx == 1 {
+                        // System32
+                        fe.set_path("C:\\VladOS\\System32");
+                        gfx.draw_file_explorer(fe);
+                        return;
+                    } else if row_idx == 2 {
+                        // Resources
+                        fe.set_path("C:\\VladOS\\Resources");
+                        gfx.draw_file_explorer(fe);
+                        return;
+                    }
+                } else if cur.eq_ignore_ascii_case("C:\\VladOS\\System32") {
+                    if row_idx == 0 || row_idx == 1 || row_idx == 2 {
+                        // drivers
+                        fe.set_path("C:\\VladOS\\System32\\drivers");
+                        gfx.draw_file_explorer(fe);
+                        return;
+                    }
+                }
+            }
         }
         return;
     }
@@ -874,6 +1709,10 @@ fn handle_mouse_click(
         if mx >= close_start && mx <= wx + ww {
             *window_open = false;
             gfx.redraw_wallpaper_rect(wx, wy, ww, wh);
+            if fe.open {
+                gfx.draw_file_explorer(fe);
+            }
+            gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
             term.add_line("[Mouse Click: CMD window closed]");
             return;
         }
@@ -914,27 +1753,23 @@ fn handle_mouse_click(
                 term.add_line(font_source);
                 term.render(gfx);
             }
-            // Tile 3: Files
+            // Tile 3: Files -> Open Windows 10 File Explorer at C:\VladOS!
             else if mx >= 48 && mx <= 148 && my >= sm_y + 168 && my <= sm_y + 218 {
-                if !*window_open {
-                    *window_open = true;
-                    gfx.draw_cmd_window();
-                }
-                term.add_line("C:\\VladOS\\System32> dir");
-                term.add_line(" Volume in drive C is VLADOS_SYS");
-                term.add_line("09/05/2026  01:00 PM             1,350 vladinit.vex");
-                term.add_line("09/05/2026  01:00 PM             2,840 explorer.vex");
-                term.add_line("09/05/2026  01:00 PM             2,180 cmd.vex");
-                term.render(gfx);
+                fe.open = true;
+                fe.view_mode = 1;
+                fe.set_path("C:\\VladOS");
+                gfx.draw_file_explorer(fe);
+                gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
+                term.add_line("[Start Menu: File Explorer opened at C:\\VladOS]");
             }
-            // Tile 4: Storage C:
+            // Tile 4: Storage C: -> Open Windows 10 File Explorer at This PC!
             else if mx >= 152 && mx <= 252 && my >= sm_y + 168 && my <= sm_y + 218 {
-                if !*window_open {
-                    *window_open = true;
-                    gfx.draw_cmd_window();
-                }
-                term.add_line("Storage C: [VladFS 32MB - 24MB Free]");
-                term.render(gfx);
+                fe.open = true;
+                fe.view_mode = 0;
+                fe.set_path("This PC");
+                gfx.draw_file_explorer(fe);
+                gfx.draw_taskbar(*start_menu_open, *window_open, fe.open);
+                term.add_line("[Start Menu: File Explorer opened at This PC]");
             }
         }
     }
@@ -990,14 +1825,20 @@ pub extern "C" fn _start() -> ! {
 
     // 1. Draw Full Authentic Windows 10 GUI Desktop
     gfx.draw_desktop();
-    let mut window_open = true;
-    gfx.draw_cmd_window();
-    let mut start_menu_open = true;
-    gfx.draw_taskbar(start_menu_open);
-    gfx.draw_start_menu();
+    let mut window_open = false;
+    let mut file_explorer = FileExplorerState::new();
+    file_explorer.open = true;
+    gfx.draw_file_explorer(&file_explorer);
+    let mut start_menu_open = false;
+    gfx.draw_taskbar(start_menu_open, window_open, file_explorer.open);
+    if start_menu_open {
+        gfx.draw_start_menu();
+    }
 
     let mut term = TerminalState::new();
-    term.render(&gfx);
+    if window_open {
+        term.render(&gfx);
+    }
 
     // 2. Initialize Windows 10 Aero Cursor Manager
     let mut cursor = CursorManager::new(450, 260);
@@ -1032,6 +1873,7 @@ pub extern "C" fn _start() -> ! {
                     &mut term,
                     &mut start_menu_open,
                     &mut window_open,
+                    &mut file_explorer,
                     mouse.x as usize,
                     mouse.y as usize,
                 );
@@ -1064,7 +1906,7 @@ pub extern "C" fn _start() -> ! {
                             let sm_y = tb_y.saturating_sub(sm_h);
                             gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
                         }
-                        gfx.draw_taskbar(start_menu_open);
+                        gfx.draw_taskbar(start_menu_open, window_open, file_explorer.open);
                         if window_open {
                             term.render(&gfx);
                         }
@@ -1098,7 +1940,15 @@ pub extern "C" fn _start() -> ! {
                     if term.input_len == 0 {
                         // Empty Enter triggers a click at current cursor position!
                         cursor.hide(&gfx);
-                        handle_mouse_click(&gfx, &mut term, &mut start_menu_open, &mut window_open, cursor.x, cursor.y);
+                        handle_mouse_click(
+                            &gfx,
+                            &mut term,
+                            &mut start_menu_open,
+                            &mut window_open,
+                            &mut file_explorer,
+                            cursor.x,
+                            cursor.y,
+                        );
                         if window_open {
                             term.render(&gfx);
                         }
@@ -1118,7 +1968,15 @@ pub extern "C" fn _start() -> ! {
                             if let (Ok(x), Ok(y)) = (xs.parse::<usize>(), ys.parse::<usize>()) {
                                 cursor.move_to(&gfx, x, y);
                                 cursor.hide(&gfx);
-                                handle_mouse_click(&gfx, &mut term, &mut start_menu_open, &mut window_open, x, y);
+                                handle_mouse_click(
+                                    &gfx,
+                                    &mut term,
+                                    &mut start_menu_open,
+                                    &mut window_open,
+                                    &mut file_explorer,
+                                    x,
+                                    y,
+                                );
                                 cursor.show(&gfx);
                             }
                         }
@@ -1128,7 +1986,12 @@ pub extern "C" fn _start() -> ! {
                         }
                     } else {
                         cursor.hide(&gfx);
-                        term.execute_command(&gfx, &mut start_menu_open);
+                        term.execute_command(
+                            &gfx,
+                            &mut start_menu_open,
+                            &mut window_open,
+                            &mut file_explorer,
+                        );
                         if window_open {
                             term.render(&gfx);
                         }
@@ -1188,7 +2051,15 @@ pub extern "C" fn _start() -> ! {
                         let target_y = if b == b'1' || b == b'2' { gfx.height.saturating_sub(440) + 130 } else { gfx.height.saturating_sub(440) + 190 };
                         cursor.move_to(&gfx, target_x, target_y);
                         cursor.hide(&gfx);
-                        handle_mouse_click(&gfx, &mut term, &mut start_menu_open, &mut window_open, target_x, target_y);
+                        handle_mouse_click(
+                            &gfx,
+                            &mut term,
+                            &mut start_menu_open,
+                            &mut window_open,
+                            &mut file_explorer,
+                            target_x,
+                            target_y,
+                        );
                         if window_open {
                             term.render(&gfx);
                         }
