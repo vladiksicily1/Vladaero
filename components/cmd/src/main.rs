@@ -465,6 +465,32 @@ fn run_diskpart_repl() {
                     len -= 1;
                     print("\x08 \x08");
                 }
+            } else if c == b'\t' {
+                // Tab autocomplete
+                let dp_candidates = [
+                    "list disk", "list volume", "select disk", "select volume",
+                    "detail disk", "detail volume", "rescan", "help", "exit",
+                ];
+                let mut completion: Option<&'static str> = None;
+                if let Ok(curr) = core::str::from_utf8(&dp_buf[..len]) {
+                    if !curr.is_empty() {
+                        for &cand in &dp_candidates {
+                            if cand.len() > curr.len() && starts_with_ignore_case(cand, curr) {
+                                completion = Some(&cand[curr.len()..]);
+                                break;
+                            }
+                        }
+                    }
+                }
+                if let Some(remainder) = completion {
+                    for rb in remainder.bytes() {
+                        if len < dp_buf.len() {
+                            dp_buf[len] = rb;
+                            len += 1;
+                        }
+                    }
+                    print(remainder);
+                }
             } else if c >= 32 && c < 127 {
                 if len < dp_buf.len() {
                     dp_buf[len] = c;
@@ -1045,6 +1071,50 @@ pub extern "C" fn _start() -> ! {
                 if len > 0 {
                     len -= 1;
                     print("\x08 \x08");
+                }
+            } else if c == b'\t' {
+                // Tab autocomplete
+                let cmd_candidates = [
+                    "cls", "dir", "echo", "exit", "explorer", "explorer.vex",
+                    "help", "menu", "mouse", "start", "sysinfo", "type", "ver",
+                    "cd", "path", "disks", "diskpart",
+                    "diskutil", "diskutil.vex", "pathedit", "pathedit.vex",
+                    "calc", "calc.vex", "notepad", "notepad.vex",
+                    "player", "player.vex", "photos", "photos.vex",
+                    "cmd", "cmd.vex", "vladinit.vex",
+                    "beep", "reboot", "restart", "shutdown", "poweroff",
+                    "C:\\VladOS", "C:\\VladOS\\System32", "C:\\VladOS\\Resources",
+                    "C:\\VladOS\\System32\\Config\\path.cfg",
+                    "C:\\Users\\Vlad\\Desktop", "C:\\Users\\Vlad\\Documents",
+                    "C:\\Users\\Vlad\\Pictures", "C:\\Users\\Vlad\\Music", "C:\\Users\\Vlad\\Videos",
+                    "Welcome.txt", "Notes.txt", "ambient.mp3", "startup.wav", "wallpaper.bmp", "logo.png", "photo.jpg",
+                ];
+                let mut completion: Option<&'static str> = None;
+                if let Ok(current_input) = core::str::from_utf8(&buf[..len]) {
+                    if !current_input.is_empty() {
+                        let last_token = if let Some(idx) = current_input.rfind(' ') {
+                            &current_input[idx + 1..]
+                        } else {
+                            current_input
+                        };
+                        if !last_token.is_empty() {
+                            for &cand in &cmd_candidates {
+                                if cand.len() > last_token.len() && starts_with_ignore_case(cand, last_token) {
+                                    completion = Some(&cand[last_token.len()..]);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if let Some(remainder) = completion {
+                    for rb in remainder.bytes() {
+                        if len < buf.len() {
+                            buf[len] = rb;
+                            len += 1;
+                        }
+                    }
+                    print(remainder);
                 }
             } else if c >= 32 && c < 127 {
                 if len < buf.len() {

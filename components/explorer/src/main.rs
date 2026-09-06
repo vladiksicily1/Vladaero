@@ -1267,17 +1267,11 @@ impl DesktopState {
             calc: CalculatorState::new(),
             iv: ImageViewerState::new(),
             mp: MediaPlayerState::new(),
-            du: DiskManagementState {
-                open: true,
-                ..DiskManagementState::new()
-            },
-            pe: PathEditorState {
-                open: true,
-                ..PathEditorState::new()
-            },
+            du: DiskManagementState::new(),
+            pe: PathEditorState::new(),
 
-            focus: 6,
-            z_order: [0, 3, 5, 4, 2, 1, 7, 6],
+            focus: 0,
+            z_order: [7, 6, 5, 4, 3, 2, 1, 0],
 
             drag: None,
 
@@ -5294,6 +5288,7 @@ const TAB_COMMANDS: &[&str] = &[
     "echo",
     "exit",
     "explorer",
+    "explorer.vex",
     "help",
     "menu",
     "mouse",
@@ -5301,6 +5296,48 @@ const TAB_COMMANDS: &[&str] = &[
     "sysinfo",
     "type",
     "ver",
+    "cd",
+    "path",
+    "disks",
+    "diskpart",
+    "diskutil",
+    "diskutil.vex",
+    "pathedit",
+    "pathedit.vex",
+    "calc",
+    "calc.vex",
+    "notepad",
+    "notepad.vex",
+    "player",
+    "player.vex",
+    "photos",
+    "photos.vex",
+    "cmd",
+    "cmd.vex",
+    "vladinit.vex",
+    "beep",
+    "reboot",
+    "restart",
+    "shutdown",
+    "poweroff",
+    "vol",
+    "mute",
+    "C:\\VladOS",
+    "C:\\VladOS\\System32",
+    "C:\\VladOS\\Resources",
+    "C:\\VladOS\\System32\\Config\\path.cfg",
+    "C:\\Users\\Vlad\\Desktop",
+    "C:\\Users\\Vlad\\Documents",
+    "C:\\Users\\Vlad\\Pictures",
+    "C:\\Users\\Vlad\\Music",
+    "C:\\Users\\Vlad\\Videos",
+    "Welcome.txt",
+    "Notes.txt",
+    "ambient.mp3",
+    "startup.wav",
+    "wallpaper.bmp",
+    "logo.png",
+    "photo.jpg",
 ];
 
 #[no_mangle]
@@ -5625,25 +5662,33 @@ pub extern "C" fn _start() -> ! {
                     // Tab auto-completion
                     if term.input_len > 0 {
                         if let Ok(curr) = core::str::from_utf8(&term.input_buf[..term.input_len]) {
-                            for &c in TAB_COMMANDS {
-                                if starts_with_ignore_case(c, curr) {
-                                    term.input_len = 0;
-                                    for byte in c.bytes() {
+                            let (prefix_len, last_token) = if let Some(idx) = curr.rfind(' ') {
+                                (idx + 1, &curr[idx + 1..])
+                            } else {
+                                (0, curr)
+                            };
+
+                            if !last_token.is_empty() {
+                                for &c in TAB_COMMANDS {
+                                    if starts_with_ignore_case(c, last_token) && c.len() > last_token.len() {
+                                        term.input_len = prefix_len;
+                                        for byte in c.bytes() {
+                                            if term.input_len < term.input_buf.len() {
+                                                term.input_buf[term.input_len] = byte;
+                                                term.input_len += 1;
+                                            }
+                                        }
                                         if term.input_len < term.input_buf.len() {
-                                            term.input_buf[term.input_len] = byte;
+                                            term.input_buf[term.input_len] = b' ';
                                             term.input_len += 1;
                                         }
+                                        if ds.cmd_open {
+                                            cursor.hide(&gfx);
+                                            term.render(&gfx, &ds);
+                                            cursor.show(&gfx);
+                                        }
+                                        break;
                                     }
-                                    if term.input_len < term.input_buf.len() {
-                                        term.input_buf[term.input_len] = b' ';
-                                        term.input_len += 1;
-                                    }
-                                    if ds.cmd_open {
-                                        cursor.hide(&gfx);
-                                        term.render(&gfx, &ds);
-                                        cursor.show(&gfx);
-                                    }
-                                    break;
                                 }
                             }
                         }

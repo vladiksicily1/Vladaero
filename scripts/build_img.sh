@@ -57,6 +57,14 @@ RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/pathedi
     cargo build --manifest-path "$REPO_DIR/components/pathedit/Cargo.toml" --target x86_64-unknown-none --release
 PATHEDIT_BIN="$REPO_DIR/components/pathedit/target/x86_64-unknown-none/release/pathedit_bin"
 
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/player/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/player/Cargo.toml" --target x86_64-unknown-none --release
+PLAYER_BIN="$REPO_DIR/components/player/target/x86_64-unknown-none/release/player_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/photos/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/photos/Cargo.toml" --target x86_64-unknown-none --release
+PHOTOS_BIN="$REPO_DIR/components/photos/target/x86_64-unknown-none/release/photos_bin"
+
 echo "2. Preparing VladOS system root ($SYSROOT_DIR)..."
 mkdir -p "$SYSROOT_DIR/VladOS/System32/config"
 mkdir -p "$SYSROOT_DIR/VladOS/System32/drivers"
@@ -87,9 +95,9 @@ cp "$DISKUTIL_BIN" "$SYSROOT_DIR/VladOS/System32/diskutil.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/diskutil.vex"
 cp "$PATHEDIT_BIN" "$SYSROOT_DIR/VladOS/System32/pathedit.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/pathedit.vex"
-cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/player.vex"
+cp "$PLAYER_BIN" "$SYSROOT_DIR/VladOS/System32/player.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/player.vex"
-cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/photos.vex"
+cp "$PHOTOS_BIN" "$SYSROOT_DIR/VladOS/System32/photos.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/photos.vex"
 
 mkdir -p "$SYSROOT_DIR/VladOS/System32/Config"

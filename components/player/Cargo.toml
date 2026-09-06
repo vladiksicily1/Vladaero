@@ -1,0 +1,17 @@
+[package]
+name = "player"
+version = "1.0.0"
+edition = "2021"
+description = "VladOS 10 Windows Media Player (.vex binary)"
+
+[[bin]]
+name = "player_bin"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = true
+codegen-units = 1
