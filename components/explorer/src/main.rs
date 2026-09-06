@@ -50,6 +50,47 @@ unsafe fn sys_read(fd: usize, buf: &mut [u8]) -> usize {
     ret
 }
 
+const SYS_FCNTL: usize = SYS_CLASS_FILE | 55;
+const F_SETFL: usize = 4;
+const O_NONBLOCK: usize = 0x0004_0000;
+
+#[inline(always)]
+unsafe fn sys_fcntl(fd: usize, cmd: usize, arg: usize) -> usize {
+    let ret: usize;
+    core::arch::asm!(
+        "syscall",
+        inlateout("rax") SYS_FCNTL => ret,
+        in("rdi") fd,
+        in("rsi") cmd,
+        in("rdx") arg,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+    ret
+}
+
+const SYS_NANOSLEEP: usize = 162;
+
+#[repr(C)]
+struct TimeSpec {
+    tv_sec: i64,
+    tv_nsec: i32,
+}
+
+#[inline(always)]
+unsafe fn sys_nanosleep(req: &TimeSpec) {
+    core::arch::asm!(
+        "syscall",
+        in("rax") SYS_NANOSLEEP,
+        in("rdi") req as *const _ as usize,
+        in("rsi") 0,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+}
+
 #[inline(always)]
 unsafe fn sys_yield() {
     core::arch::asm!(
@@ -918,16 +959,24 @@ pub extern "C" fn _start() -> ! {
     let mut cursor = CursorManager::new(450, 260);
     cursor.show(&gfx);
 
+    // Make stdin (fd 0) non-blocking so keyboard polling never stalls mouse / touch tracking!
+    unsafe {
+        sys_fcntl(0, F_SETFL, O_NONBLOCK);
+    }
+
     let mut last_mouse_seq = 0u32;
     let mut last_buttons = 0u32;
     let mut read_buf = [0u8; 16];
     let mut esc_state = 0u8; // 0 = normal, 1 = saw 0x1B, 2 = saw '['
 
     loop {
-        // 3. Poll Hardware PS/2 Mouse Subsystem via SYS_VLADOS_MOUSE
+        let mut had_event = false;
+
+        // 3. Poll Hardware PS/2 & USB Tablet Mouse Subsystem via SYS_VLADOS_MOUSE
         let mut mouse = MouseData::default();
         let seq = unsafe { sys_get_mouse(&mut mouse) } as u32;
         if seq != 0 && seq != last_mouse_seq {
+            had_event = true;
             last_mouse_seq = seq;
             cursor.move_to(&gfx, mouse.x as usize, mouse.y as usize);
 
@@ -947,9 +996,10 @@ pub extern "C" fn _start() -> ! {
             last_buttons = mouse.buttons;
         }
 
-        // 4. Poll Keyboard Input
+        // 4. Poll Keyboard Input (Non-blocking)
         let n = unsafe { sys_read(0, &mut read_buf) };
         if n > 0 && n <= read_buf.len() {
+            had_event = true;
             for i in 0..n {
                 let b = read_buf[i];
 
@@ -1114,9 +1164,14 @@ pub extern "C" fn _start() -> ! {
                     }
                 }
             }
-        } else {
+        }
+        if !had_event {
+            let sleep_req = TimeSpec {
+                tv_sec: 0,
+                tv_nsec: 2_000_000, // 2ms sleep for 500 Hz polling & 0% CPU consumption
+            };
             unsafe {
-                sys_yield();
+                sys_nanosleep(&sleep_req);
             }
         }
     }
