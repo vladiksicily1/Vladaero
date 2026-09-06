@@ -75,6 +75,59 @@ cp "$NOTEPAD_BIN" "$SYSROOT_DIR/VladOS/System32/notepad.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/notepad.vex"
 cp "$CALC_BIN" "$SYSROOT_DIR/VladOS/System32/calc.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/calc.vex"
+cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/player.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/player.vex"
+cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/photos.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/photos.vex"
+
+# Desktop Shortcuts (.lnk)
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Command Prompt.lnk"
+[Shortcut]
+Target=/VladOS/System32/cmd.vex
+Icon=cmd
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/File Explorer.lnk"
+[Shortcut]
+Target=/VladOS/System32/explorer.vex
+Icon=explorer
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Notepad.lnk"
+[Shortcut]
+Target=/VladOS/System32/notepad.vex
+Icon=notepad
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Calculator.lnk"
+[Shortcut]
+Target=/VladOS/System32/calc.vex
+Icon=calc
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Media Player.lnk"
+[Shortcut]
+Target=/VladOS/System32/player.vex
+Icon=player
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Photos.lnk"
+[Shortcut]
+Target=/VladOS/System32/photos.vex
+Icon=photos
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Control Panel.lnk"
+[Shortcut]
+Target=ControlPanel
+Icon=control
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/This PC.lnk"
+[Shortcut]
+Target=ThisPC
+Icon=computer
+EOF
 
 # Install standard media files
 cp "$REPO_DIR/resources/media/wallpaper.bmp" "$SYSROOT_DIR/Users/Vlad/Pictures/"

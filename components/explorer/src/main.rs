@@ -276,6 +276,62 @@ unsafe fn sys_drives(buf: &mut [u8]) -> usize {
 
 static mut TERM_EXEC_BUF: [u8; 4096] = [0u8; 4096];
 
+const SYS_VLADOS_BEEP: usize  = 0x5655;
+const SYS_VLADOS_POWER: usize = 0x5656;
+
+#[inline(always)]
+unsafe fn sys_beep(freq_hz: u32, duration_ms: u32) {
+    core::arch::asm!(
+        "syscall",
+        in("rax") SYS_VLADOS_BEEP,
+        in("rdi") freq_hz as usize,
+        in("rsi") duration_ms as usize,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+}
+
+#[inline(always)]
+unsafe fn sys_power(action: usize) {
+    core::arch::asm!(
+        "syscall",
+        in("rax") SYS_VLADOS_POWER,
+        in("rdi") action,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack)
+    );
+}
+
+// -----------------------------------------------------------------------------
+// Authentic Soundscape Tracks for Media Player
+// -----------------------------------------------------------------------------
+// Track 0: Aero Ambient (C5, E5, G5, C6, B5, G5, A5, F5, D5, E5, G5, C5...)
+const NOTES_AERO: &[(u32, usize)] = &[
+    (523, 12), (659, 12), (784, 16), (1046, 20),
+    (988, 12), (784, 12), (880, 16), (698, 12),
+    (587, 12), (659, 12), (784, 16), (523, 24),
+    (0, 8),
+    (587, 12), (784, 12), (880, 16), (1046, 20),
+    (988, 12), (659, 12), (523, 28),
+    (0, 12),
+];
+
+// Track 1: Startup Chime (Eb4, Bb4, G4, Ab4, Eb5)
+const NOTES_STARTUP: &[(u32, usize)] = &[
+    (311, 14), (466, 14), (392, 14), (415, 18), (622, 32),
+    (0, 24),
+];
+
+// Track 2: Retro 80s Synthwave (A4, C5, E5, A5, G5, E5, D5, E5)
+const NOTES_RETRO: &[(u32, usize)] = &[
+    (440, 8), (0, 2), (440, 8), (0, 2), (523, 10), (659, 10),
+    (880, 14), (784, 10), (659, 10), (587, 10), (523, 14),
+    (440, 12), (392, 12), (440, 20),
+    (0, 10),
+];
+
 
 #[derive(Clone, Copy)]
 pub struct ListedEntry {
@@ -321,6 +377,8 @@ pub struct NotepadState {
     pub file_path_len: usize,
     pub content: [u8; 4096],
     pub content_len: usize,
+    pub menu_open: Option<usize>, // 0: File, 1: Edit, 2: Help
+    pub show_about: bool,
 }
 
 impl NotepadState {
@@ -340,6 +398,8 @@ impl NotepadState {
             file_path_len: 0,
             content: [0u8; 4096],
             content_len: 0,
+            menu_open: None,
+            show_about: false,
         };
         s.set_path(r"C:\Users\Vlad\Documents\Notes.txt");
         let initial = b"Welcome to VladOS Notepad!
@@ -373,6 +433,11 @@ Press Ctrl+S or click [Save] to commit changes.
         self.open = true;
     }
 
+    pub fn clear(&mut self) {
+        self.content_len = 0;
+        self.set_path(r"C:\Users\Vlad\Documents\Untitled.txt");
+    }
+
     pub fn save_file(&self) {
         let p = self.path_str();
         unsafe { sys_vfs_write(p, &self.content[..self.content_len]) };
@@ -401,6 +466,9 @@ pub struct ImageViewerState {
     pub file_size: usize,
     pub raw_bytes: [u8; 4096],
     pub raw_len: usize,
+    pub rotation: usize, // 0, 90, 180, 270 degrees
+    pub zoom: usize,     // 100, 150, 200 percent
+    pub properties_open: bool,
 }
 
 impl ImageViewerState {
@@ -424,7 +492,26 @@ impl ImageViewerState {
             file_size: 0,
             raw_bytes: [0u8; 4096],
             raw_len: 0,
+            rotation: 0,
+            zoom: 100,
+            properties_open: false,
         }
+    }
+
+    pub fn rotate(&mut self) {
+        self.rotation = (self.rotation + 90) % 360;
+    }
+
+    pub fn cycle_zoom(&mut self) {
+        self.zoom = match self.zoom {
+            100 => 150,
+            150 => 200,
+            _ => 100,
+        };
+    }
+
+    pub fn toggle_properties(&mut self) {
+        self.properties_open = !self.properties_open;
     }
 
     pub fn open_image(&mut self, p: &str) {
@@ -489,6 +576,11 @@ pub struct MediaPlayerState {
     pub artist_len: usize,
     pub is_playing: bool,
     pub anim_tick: usize,
+    pub track_idx: usize,
+    pub note_idx: usize,
+    pub note_tick: usize,
+    pub volume: usize,
+    pub is_muted: bool,
 }
 
 impl MediaPlayerState {
@@ -506,21 +598,134 @@ impl MediaPlayerState {
             restore_h: 380,
             file_path: [0u8; 128],
             file_path_len: 0,
-            media_type: "MP3 Audio (128 kbps stereo)",
+            media_type: "MPEG-1 Layer III Audio (128 kbps)",
             title: [0u8; 48],
             title_len: 0,
             artist: [0u8; 48],
             artist_len: 0,
-            is_playing: true,
+            is_playing: false,
             anim_tick: 0,
+            track_idx: 0,
+            note_idx: 0,
+            note_tick: 0,
+            volume: 100,
+            is_muted: false,
         };
-        let t = b"VladOS Soundscape";
-        s.title[..t.len()].copy_from_slice(t);
-        s.title_len = t.len();
-        let a = b"Vlad Audio Corp";
-        s.artist[..a.len()].copy_from_slice(a);
-        s.artist_len = a.len();
+        s.apply_track_info();
         s
+    }
+
+    pub fn apply_track_info(&mut self) {
+        match self.track_idx {
+            0 => {
+                self.media_type = "MPEG-1 Layer III Audio (128 kbps)";
+                let t = b"Aero Ambient Theme";
+                self.title[..t.len()].copy_from_slice(t);
+                self.title_len = t.len();
+                let a = b"VladOS Studio";
+                self.artist[..a.len()].copy_from_slice(a);
+                self.artist_len = a.len();
+            }
+            1 => {
+                self.media_type = "PCM WAVE Audio (22.05 kHz 16-bit)";
+                let t = b"Startup Chime";
+                self.title[..t.len()].copy_from_slice(t);
+                self.title_len = t.len();
+                let a = b"VladOS System Chimes";
+                self.artist[..a.len()].copy_from_slice(a);
+                self.artist_len = a.len();
+            }
+            _ => {
+                self.media_type = "MPEG-1 Layer III Audio (320 kbps)";
+                let t = b"Retro 80s Synthwave";
+                self.title[..t.len()].copy_from_slice(t);
+                self.title_len = t.len();
+                let a = b"Vlad Wave Records";
+                self.artist[..a.len()].copy_from_slice(a);
+                self.artist_len = a.len();
+            }
+        }
+    }
+
+    pub fn tick_audio(&mut self) {
+        if !self.open || !self.is_playing || self.is_muted || self.volume == 0 {
+            unsafe { sys_beep(0, 0) };
+            return;
+        }
+
+        let notes = match self.track_idx {
+            0 => NOTES_AERO,
+            1 => NOTES_STARTUP,
+            _ => NOTES_RETRO,
+        };
+
+        if self.note_idx >= notes.len() {
+            self.note_idx = 0;
+            self.note_tick = 0;
+        }
+
+        let (freq, dur) = notes[self.note_idx];
+        if self.note_tick == 0 {
+            unsafe { sys_beep(freq, 0) };
+        }
+
+        self.note_tick += 1;
+        if self.note_tick >= dur {
+            self.note_tick = 0;
+            self.note_idx = (self.note_idx + 1) % notes.len();
+        }
+
+        self.anim_tick = self.anim_tick.wrapping_add(1);
+    }
+
+    pub fn play(&mut self) {
+        self.is_playing = true;
+        self.note_tick = 0;
+    }
+
+    pub fn stop(&mut self) {
+        self.is_playing = false;
+        self.note_tick = 0;
+        self.note_idx = 0;
+        unsafe { sys_beep(0, 0) };
+    }
+
+    pub fn toggle_play(&mut self) {
+        if self.is_playing {
+            self.stop();
+        } else {
+            self.play();
+        }
+    }
+
+    pub fn next_track(&mut self) {
+        self.track_idx = (self.track_idx + 1) % 3;
+        self.note_idx = 0;
+        self.note_tick = 0;
+        self.apply_track_info();
+        self.play();
+    }
+
+    pub fn prev_track(&mut self) {
+        self.track_idx = if self.track_idx == 0 { 2 } else { self.track_idx - 1 };
+        self.note_idx = 0;
+        self.note_tick = 0;
+        self.apply_track_info();
+        self.play();
+    }
+
+    pub fn toggle_mute(&mut self) {
+        self.is_muted = !self.is_muted;
+        if self.is_muted {
+            unsafe { sys_beep(0, 0) };
+        }
+    }
+
+    pub fn set_volume(&mut self, vol: usize) {
+        self.volume = vol.min(100);
+        if self.volume == 0 {
+            unsafe { sys_beep(0, 0) };
+        }
     }
 
     pub fn open_media(&mut self, p: &str) {
@@ -529,31 +734,16 @@ impl MediaPlayerState {
         self.file_path[..l].copy_from_slice(&b[..l]);
         self.file_path_len = l;
 
-        if p.ends_with(".mp3") {
-            self.media_type = "MPEG-1 Layer III Audio (128 kbps stereo)";
-            let t = b"Aero Ambient Theme";
-            self.title[..t.len()].copy_from_slice(t);
-            self.title_len = t.len();
-            let a = b"VladOS Studio";
-            self.artist[..a.len()].copy_from_slice(a);
-            self.artist_len = a.len();
-        } else if p.ends_with(".wav") {
-            self.media_type = "PCM WAVE Audio (22.05 kHz 16-bit)";
-            let t = b"Startup Chime";
-            self.title[..t.len()].copy_from_slice(t);
-            self.title_len = t.len();
-            let a = b"VladOS System Chimes";
-            self.artist[..a.len()].copy_from_slice(a);
-            self.artist_len = a.len();
-        } else if p.ends_with(".mp4") {
-            self.media_type = "MPEG-4 H.264 Video (1280x720 30fps)";
-            let t = b"VladOS Presentation";
-            self.title[..t.len()].copy_from_slice(t);
-            self.title_len = t.len();
-            let a = b"Vlad Digital Media";
-            self.artist[..a.len()].copy_from_slice(a);
-            self.artist_len = a.len();
+        if p.ends_with(".wav") || p.ends_with("startup.wav") {
+            self.track_idx = 1;
+        } else if p.ends_with("ambient.mp3") || p.ends_with("Aero.mp3") {
+            self.track_idx = 0;
+        } else {
+            self.track_idx = 2;
         }
+        self.note_idx = 0;
+        self.note_tick = 0;
+        self.apply_track_info();
         self.is_playing = true;
         self.open = true;
     }
@@ -698,6 +888,83 @@ impl CalculatorState {
         self.current_op = ' ';
         self.clear_on_next = false;
     }
+
+    pub fn toggle_sign(&mut self) {
+        if self.display_len == 1 && self.display[0] == b'0' {
+            return;
+        }
+        if self.display[0] == b'-' {
+            for i in 1..self.display_len {
+                self.display[i - 1] = self.display[i];
+            }
+            self.display_len -= 1;
+        } else if self.display_len < 31 {
+            for i in (0..self.display_len).rev() {
+                self.display[i + 1] = self.display[i];
+            }
+            self.display[0] = b'-';
+            self.display_len += 1;
+        }
+    }
+
+    pub fn press_dot(&mut self) {
+        if self.clear_on_next {
+            self.display[0] = b'0';
+            self.display[1] = b'.';
+            self.display_len = 2;
+            self.clear_on_next = false;
+            return;
+        }
+        let mut has_dot = false;
+        for i in 0..self.display_len {
+            if self.display[i] == b'.' {
+                has_dot = true;
+                break;
+            }
+        }
+        if !has_dot && self.display_len < 30 {
+            self.display[self.display_len] = b'.';
+            self.display_len += 1;
+        }
+    }
+
+    pub fn clear_entry(&mut self) {
+        self.display[0] = b'0';
+        self.display_len = 1;
+        self.clear_on_next = false;
+    }
+
+    pub fn press_percent(&mut self) {
+        let cur = self.parse_val();
+        let res = if self.accumulator != 0 {
+            (self.accumulator * cur) / 100
+        } else {
+            cur / 100
+        };
+        self.display_len = 0;
+        let mut n = if res < 0 { -res } else { res };
+        if n == 0 {
+            self.display[0] = b'0';
+            self.display_len = 1;
+        } else {
+            let mut buf = [0u8; 32];
+            let mut i = 0;
+            while n > 0 && i < 30 {
+                buf[i] = b'0' + (n % 10) as u8;
+                n /= 10;
+                i += 1;
+            }
+            if res < 0 {
+                buf[i] = b'-';
+                i += 1;
+            }
+            for j in 0..i {
+                self.display[j] = buf[i - 1 - j];
+            }
+            self.display_len = i;
+        }
+        self.clear_on_next = true;
+    }
 }
 
 pub struct FileExplorerState {
@@ -714,6 +981,12 @@ pub struct FileExplorerState {
     pub view_mode: usize, // 0 = This PC, 1 = Directory
     pub current_path: [u8; 128],
     pub current_path_len: usize,
+    pub history: [[u8; 128]; 16],
+    pub history_lens: [usize; 16],
+    pub history_len: usize,
+    pub history_pos: usize,
+    pub selected_idx: Option<usize>,
+    pub properties_open: bool,
 }
 
 impl FileExplorerState {
@@ -732,8 +1005,14 @@ impl FileExplorerState {
             view_mode: 0,
             current_path: [0u8; 128],
             current_path_len: 0,
+            history: [[0u8; 128]; 16],
+            history_lens: [0usize; 16],
+            history_len: 0,
+            history_pos: 0,
+            selected_idx: None,
+            properties_open: false,
         };
-        s.set_path("This PC");
+        s.navigate_to("This PC");
         s
     }
 
@@ -742,6 +1021,58 @@ impl FileExplorerState {
         let len = bytes.len().min(128);
         self.current_path[..len].copy_from_slice(&bytes[..len]);
         self.current_path_len = len;
+        self.selected_idx = None;
+    }
+
+    pub fn navigate_to(&mut self, path: &str) {
+        self.set_path(path);
+        if self.history_len < 16 {
+            let pos = self.history_len;
+            let bytes = path.as_bytes();
+            let len = bytes.len().min(128);
+            self.history[pos][..len].copy_from_slice(&bytes[..len]);
+            self.history_lens[pos] = len;
+            self.history_pos = pos;
+            self.history_len += 1;
+        } else {
+            for i in 0..15 {
+                self.history[i] = self.history[i + 1];
+                self.history_lens[i] = self.history_lens[i + 1];
+            }
+            let bytes = path.as_bytes();
+            let len = bytes.len().min(128);
+            self.history[15][..len].copy_from_slice(&bytes[..len]);
+            self.history_lens[15] = len;
+            self.history_pos = 15;
+        }
+    }
+
+    pub fn go_back(&mut self) {
+        if self.history_pos > 0 {
+            self.history_pos -= 1;
+            let len = self.history_lens[self.history_pos];
+            self.current_path[..len].copy_from_slice(&self.history[self.history_pos][..len]);
+            self.current_path_len = len;
+            self.selected_idx = None;
+            let s = self.path_str();
+            self.view_mode = if s == "This PC" { 0 } else { 1 };
+        }
+    }
+
+    pub fn go_forward(&mut self) {
+        if self.history_pos + 1 < self.history_len {
+            self.history_pos += 1;
+            let len = self.history_lens[self.history_pos];
+            self.current_path[..len].copy_from_slice(&self.history[self.history_pos][..len]);
+            self.current_path_len = len;
+            self.selected_idx = None;
+            let s = self.path_str();
+            self.view_mode = if s == "This PC" { 0 } else { 1 };
+        }
+    }
+
+    pub fn toggle_view(&mut self) {
+        self.view_mode = if self.view_mode == 0 { 1 } else { 0 };
     }
 
     pub fn path_str(&self) -> &str {
@@ -752,7 +1083,7 @@ impl FileExplorerState {
         let cur = self.path_str();
         if cur == "This PC" || cur == "C:\\" || cur == "D:\\" || cur == "E:\\" || cur == "U:\\" || cur == "/" {
             self.view_mode = 0;
-            self.set_path("This PC");
+            self.navigate_to("This PC");
             return;
         }
         let target_len = if let Some(idx) = cur.rfind('\\') {
@@ -768,10 +1099,32 @@ impl FileExplorerState {
         };
         if target_len == 0 {
             self.view_mode = 0;
-            self.set_path("This PC");
+            self.navigate_to("This PC");
         } else {
-            self.current_path_len = target_len;
+            let mut up_buf = [0u8; 128];
+            up_buf[..target_len].copy_from_slice(&self.current_path[..target_len]);
+            if let Ok(up_s) = core::str::from_utf8(&up_buf[..target_len]) {
+                self.navigate_to(up_s);
+            }
         }
+    }
+
+    pub fn delete_selected(&mut self) -> bool {
+        if let Some(idx) = self.selected_idx {
+            let count = unsafe { CURRENT_EXP_COUNT };
+            if idx < count {
+                let ent = unsafe { CURRENT_EXP_ENTRIES[idx] };
+                let cur = self.path_str();
+                let mut full_buf = [0u8; 128];
+                let full_len = join_path(cur, ent.name_str(), &mut full_buf);
+                if let Ok(full_path) = core::str::from_utf8(&full_buf[..full_len]) {
+                    unsafe { sys_vfs_unlink(full_path) };
+                    self.selected_idx = None;
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 
@@ -817,6 +1170,11 @@ pub struct DesktopState {
 
     pub action_center_open: bool,
     pub quick_settings: [bool; 8],
+
+    pub volume_flyout_open: bool,
+    pub network_flyout_open: bool,
+    pub calendar_flyout_open: bool,
+    pub keyboard_lang: usize, // 0 = "RUS", 1 = "ENG"
 }
 
 impl DesktopState {
@@ -851,6 +1209,11 @@ impl DesktopState {
 
             action_center_open: false,
             quick_settings: [true, true, false, true, true, false, false, false],
+
+            volume_flyout_open: false,
+            network_flyout_open: false,
+            calendar_flyout_open: false,
+            keyboard_lang: 0,
         }
     }
 
@@ -1394,41 +1757,117 @@ impl Gfx {
         }
     }
 
+    fn draw_shortcut_badge(&self, x: usize, y: usize) {
+        self.fill_rect(x, y, 11, 11, 0xFFFFFF);
+        self.draw_rect_outline(x, y, 11, 11, 0x808080);
+        self.fill_rect(x + 2, y + 6, 4, 2, 0x0078D7);
+        self.fill_rect(x + 4, y + 4, 3, 2, 0x0078D7);
+        self.fill_rect(x + 6, y + 2, 3, 2, 0x0078D7);
+        self.fill_rect(x + 7, y + 4, 2, 2, 0x0078D7);
+    }
+
     fn draw_desktop_icons(&self) {
-        let icons = [
-            ("This PC", 20, 0x0078D7),
-            ("Recycle Bin", 100, 0x00B7C3),
-            ("Control Panel", 180, 0x005A9E),
-            ("Network", 260, 0x1E90FF),
-            ("Welcome.txt", 340, 0xFFFFFF),
+        let col0 = [
+            ("This PC", 20, 0x0078D7, false, 0),
+            ("Recycle Bin", 92, 0x00B7C3, false, 1),
+            ("Command Prompt", 164, 0x00B7C3, true, 2),
+            ("File Explorer", 236, 0xFFC83B, true, 3),
+            ("Notepad", 308, 0x0078D7, true, 4),
         ];
 
-        for &(name, y, accent) in &icons {
+        let col1 = [
+            ("Calculator", 20, 0x2A2A2A, true, 5),
+            ("Media Player", 92, 0x9A4D8B, true, 6),
+            ("Photos", 164, 0x50D090, true, 7),
+            ("Control Panel", 236, 0x005A9E, true, 8),
+            ("Welcome.txt", 308, 0xEAEAEA, false, 9),
+        ];
+
+        for &(name, y, accent, is_shortcut, icon_type) in &col0 {
             let x = 24;
-            if name == "This PC" {
+            self.draw_single_desktop_icon(x, y, name, accent, is_shortcut, icon_type);
+        }
+        for &(name, y, accent, is_shortcut, icon_type) in &col1 {
+            let x = 114;
+            self.draw_single_desktop_icon(x, y, name, accent, is_shortcut, icon_type);
+        }
+    }
+
+    fn draw_single_desktop_icon(&self, x: usize, y: usize, name: &str, accent: u32, is_shortcut: bool, icon_type: usize) {
+        match icon_type {
+            0 => {
+                // This PC (Monitor + Stand)
                 self.fill_rect(x + 4, y, 32, 22, 0x222730);
                 self.draw_rect_outline(x + 4, y, 32, 22, accent);
                 self.fill_rect(x + 7, y + 3, 26, 16, 0x005A9E);
                 self.fill_rect(x + 18, y + 22, 4, 6, 0x88909D);
                 self.fill_rect(x + 12, y + 28, 16, 2, 0x88909D);
-            } else if name == "Recycle Bin" {
+            }
+            1 => {
+                // Recycle Bin
                 self.fill_rect(x + 8, y + 6, 24, 24, 0x1E242C);
                 self.draw_rect_outline(x + 8, y + 6, 24, 24, accent);
                 self.fill_rect(x + 6, y + 4, 28, 3, accent);
                 self.fill_rect(x + 14, y + 10, 2, 16, 0x00B7C3);
                 self.fill_rect(x + 20, y + 10, 2, 16, 0x00B7C3);
                 self.fill_rect(x + 26, y + 10, 2, 16, 0x00B7C3);
-            } else if name == "Control Panel" {
+            }
+            2 => {
+                // CMD Prompt
+                self.fill_rect(x + 6, y + 4, 28, 24, 0x14181E);
+                self.draw_rect_outline(x + 6, y + 4, 28, 24, 0x2D333C);
+                self.fill_rect(x + 6, y + 4, 28, 5, 0x242A34);
+                self.draw_text(x + 10, y + 11, ">_", 0x00B7C3, 0x14181E);
+            }
+            3 => {
+                // File Explorer Folder
+                self.fill_rect(x + 6, y + 6, 28, 22, 0xFFC83B);
+                self.fill_rect(x + 9, y + 3, 11, 4, 0xFFC83B);
+                self.fill_rect(x + 10, y + 9, 20, 15, 0x0078D7);
+            }
+            4 => {
+                // Notepad
+                self.fill_rect(x + 8, y + 2, 24, 28, 0x0078D7);
+                self.draw_rect_outline(x + 8, y + 2, 24, 28, 0x1E90FF);
+                self.fill_rect(x + 12, y + 7, 16, 2, 0xFFFFFF);
+                self.fill_rect(x + 12, y + 12, 16, 2, 0xFFFFFF);
+                self.fill_rect(x + 12, y + 17, 12, 2, 0xFFFFFF);
+                self.fill_rect(x + 12, y + 22, 16, 2, 0xFFFFFF);
+            }
+            5 => {
+                // Calculator
+                self.fill_rect(x + 8, y + 3, 24, 26, 0x202020);
+                self.draw_rect_outline(x + 8, y + 3, 24, 26, 0x383838);
+                self.fill_rect(x + 11, y + 6, 18, 5, 0x0078D7);
+                self.fill_rect(x + 11, y + 14, 4, 4, 0x444444);
+                self.fill_rect(x + 18, y + 14, 4, 4, 0x444444);
+                self.fill_rect(x + 25, y + 14, 4, 4, 0x0078D7);
+                self.fill_rect(x + 11, y + 21, 4, 4, 0x444444);
+                self.fill_rect(x + 18, y + 21, 4, 4, 0x444444);
+                self.fill_rect(x + 25, y + 21, 4, 4, 0x0078D7);
+            }
+            6 => {
+                // Media Player
+                self.fill_rect(x + 6, y + 4, 28, 26, 0x9A4D8B);
+                self.draw_rect_outline(x + 6, y + 4, 28, 26, 0xD080FF);
+                self.draw_text(x + 15, y + 10, ">", 0xFFFFFF, 0x9A4D8B);
+            }
+            7 => {
+                // Photos
+                self.fill_rect(x + 6, y + 4, 28, 26, 0x1A2230);
+                self.draw_rect_outline(x + 6, y + 4, 28, 26, 0x50D090);
+                self.fill_rect(x + 10, y + 8, 20, 14, 0x50D090);
+                self.fill_rect(x + 14, y + 11, 4, 4, 0xFFFFFF);
+            }
+            8 => {
+                // Control Panel
                 self.fill_rect(x + 6, y + 4, 28, 26, 0x222730);
                 self.draw_rect_outline(x + 6, y + 4, 28, 26, 0x88909D);
                 self.fill_rect(x + 14, y + 11, 12, 12, accent);
                 self.fill_rect(x + 18, y + 15, 4, 4, 0x101418);
-            } else if name == "Network" {
-                self.fill_rect(x + 6, y + 4, 28, 26, 0x1A2230);
-                self.draw_rect_outline(x + 6, y + 4, 28, 26, accent);
-                self.fill_rect(x + 10, y + 16, 20, 2, 0x00B7C3);
-                self.fill_rect(x + 19, y + 7, 2, 20, 0x00B7C3);
-            } else {
+            }
+            _ => {
+                // Text Document (.txt)
                 self.fill_rect(x + 8, y + 2, 24, 28, 0xEAEAEA);
                 self.draw_rect_outline(x + 8, y + 2, 24, 28, 0xAAAAAA);
                 self.fill_rect(x + 12, y + 8, 16, 2, 0x0078D7);
@@ -1436,9 +1875,290 @@ impl Gfx {
                 self.fill_rect(x + 12, y + 18, 16, 2, 0x555555);
                 self.fill_rect(x + 12, y + 23, 10, 2, 0x555555);
             }
-
-            self.draw_text(x, y + 36, name, 0xFFFFFF, 0x0A162B);
         }
+
+        if is_shortcut {
+            self.draw_shortcut_badge(x + 4, y + 20);
+        }
+
+        self.draw_text(x, y + 36, name, 0xFFFFFF, 0x0A162B);
+    }
+
+    fn draw_volume_flyout(&self, ds: &DesktopState) {
+        let w = 270;
+        let h = 96;
+        let x = self.width.saturating_sub(w + 10);
+        let y = self.height.saturating_sub(40 + h + 6);
+
+        self.draw_window_shadow(x, y, w, h);
+        self.draw_rect_outline(x, y, w, h, 0x3A414D);
+        self.fill_rect(x + 1, y + 1, w - 2, h - 2, 0x1B1F26);
+
+        self.draw_text(x + 16, y + 12, "Speakers (Realtek HD Audio / Speaker)", 0xCCD4E0, 0x1B1F26);
+
+        let vol_val = if ds.mp.is_muted { 0 } else { ds.mp.volume };
+        let track_w = 160;
+        let fill_w = (track_w * vol_val) / 100;
+        self.fill_rect(x + 16, y + 46, track_w, 6, 0x333A44);
+        self.fill_rect(x + 16, y + 46, fill_w, 6, 0x0078D7);
+        let thumb_x = x + 16 + fill_w.saturating_sub(4);
+        self.fill_rect(thumb_x, y + 42, 8, 14, 0xFFFFFF);
+
+        let mut num_buf = [0u8; 8];
+        let num_str = if ds.mp.is_muted {
+            "Mute"
+        } else if vol_val >= 100 {
+            "100%"
+        } else {
+            num_buf[0] = b'0' + (vol_val / 10) as u8;
+            num_buf[1] = b'0' + (vol_val % 10) as u8;
+            num_buf[2] = b'%';
+            core::str::from_utf8(&num_buf[..3]).unwrap_or("50%")
+        };
+        self.draw_text(x + 185, y + 42, num_str, 0xFFFFFF, 0x1B1F26);
+
+        // Mute button [X] / [O]
+        let mute_bg = if ds.mp.is_muted { 0xE81123 } else { 0x2E3540 };
+        self.fill_rect(x + 230, y + 40, 24, 20, mute_bg);
+        self.draw_rect_outline(x + 230, y + 40, 24, 20, 0x4A5260);
+        let icon = if ds.mp.is_muted { "X" } else { "V" };
+        self.draw_text(x + 238, y + 43, icon, 0xFFFFFF, mute_bg);
+
+        self.draw_text(x + 16, y + 68, "Click bar to change volume or [X] to mute", 0x7E8794, 0x1B1F26);
+    }
+
+    fn draw_network_flyout(&self, _ds: &DesktopState) {
+        let w = 280;
+        let h = 180;
+        let x = self.width.saturating_sub(w + 10);
+        let y = self.height.saturating_sub(40 + h + 6);
+
+        self.draw_window_shadow(x, y, w, h);
+        self.draw_rect_outline(x, y, w, h, 0x3A414D);
+        self.fill_rect(x + 1, y + 1, w - 2, h - 2, 0x1B1F26);
+
+        self.draw_text(x + 16, y + 14, "VladNet LAN / Wi-Fi", 0x00B7C3, 0x1B1F26);
+        self.draw_text(x + 16, y + 32, "Status: Connected, Internet access", 0x76FF03, 0x1B1F26);
+        self.fill_rect(x + 16, y + 50, w - 32, 1, 0x2A313C);
+
+        self.draw_text(x + 16, y + 60, "IPv4:        192.168.1.100", 0xCCCCCC, 0x1B1F26);
+        self.draw_text(x + 16, y + 78, "Subnet:      255.255.255.0", 0x88909D, 0x1B1F26);
+        self.draw_text(x + 16, y + 96, "Gateway:     192.168.1.1", 0x88909D, 0x1B1F26);
+        self.draw_text(x + 16, y + 114, "Link Speed:  1.0 Gbps Full Duplex", 0x88909D, 0x1B1F26);
+
+        self.fill_rect(x + 16, y + 138, 120, 26, 0x242A34);
+        self.draw_rect_outline(x + 16, y + 138, 120, 26, 0x3A414D);
+        self.draw_text(x + 28, y + 144, "Properties", 0xFFFFFF, 0x242A34);
+
+        self.fill_rect(x + 144, y + 138, 120, 26, 0x242A34);
+        self.draw_rect_outline(x + 144, y + 138, 120, 26, 0x3A414D);
+        self.draw_text(x + 160, y + 144, "Disconnect", 0xCCCCCC, 0x242A34);
+    }
+
+    fn draw_calendar_flyout(&self, _ds: &DesktopState) {
+        let w = 290;
+        let h = 310;
+        let x = self.width.saturating_sub(w + 10);
+        let y = self.height.saturating_sub(40 + h + 6);
+
+        self.draw_window_shadow(x, y, w, h);
+        self.draw_rect_outline(x, y, w, h, 0x3A414D);
+        self.fill_rect(x + 1, y + 1, w - 2, h - 2, 0x1B1F26);
+
+        self.draw_text(x + 20, y + 14, "19:20:00", 0xFFFFFF, 0x1B1F26);
+        self.draw_text(x + 20, y + 32, "Sunday, September 6, 2026", 0x0078D7, 0x1B1F26);
+        self.fill_rect(x + 16, y + 52, w - 32, 1, 0x2A313C);
+
+        self.draw_text(x + 20, y + 62, "<   September 2026   >", 0xCCD4E0, 0x1B1F26);
+
+        let dows = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+        for (i, d) in dows.iter().enumerate() {
+            self.draw_text(x + 20 + i * 36, y + 86, d, 0x7E8794, 0x1B1F26);
+        }
+
+        let mut day = 1;
+        let mut row = 0;
+        let mut col = 1;
+        let mut num_buf = [0u8; 4];
+        while day <= 30 {
+            let dx = x + 20 + col * 36;
+            let dy = y + 110 + row * 28;
+
+            if day == 6 {
+                self.fill_rect(dx - 4, dy - 4, 26, 22, 0x0078D7);
+                num_buf[0] = b'0' + (day as u8);
+                if let Ok(s) = core::str::from_utf8(&num_buf[..1]) {
+                    self.draw_text(dx + 4, dy, s, 0xFFFFFF, 0x0078D7);
+                }
+            } else {
+                let s = if day < 10 {
+                    num_buf[0] = b'0' + (day as u8);
+                    core::str::from_utf8(&num_buf[..1]).unwrap_or("")
+                } else {
+                    num_buf[0] = b'0' + (day / 10) as u8;
+                    num_buf[1] = b'0' + (day % 10) as u8;
+                    core::str::from_utf8(&num_buf[..2]).unwrap_or("")
+                };
+                let col_txt = if col >= 5 { 0x60CDFF } else { 0xCCD4E0 };
+                self.draw_text(dx, dy, s, col_txt, 0x1B1F26);
+            }
+
+            col += 1;
+            if col == 7 {
+                col = 0;
+                row += 1;
+            }
+            day += 1;
+        }
+
+        self.fill_rect(x + 16, y + 265, w - 32, 1, 0x2A313C);
+        self.draw_text(x + 20, y + 278, "Hide calendar", 0x0078D7, 0x1B1F26);
+    }
+
+    fn draw_explorer_properties(&self, fe: &FileExplorerState) {
+        let w = 340;
+        let h = 280;
+        let x = (self.width.saturating_sub(w)) / 2;
+        let y = (self.height.saturating_sub(h)) / 2;
+
+        self.draw_window_shadow(x, y, w, h);
+        self.draw_rect_outline(x, y, w, h, 0x0078D7);
+        self.fill_rect(x + 1, y + 1, w - 2, 28, 0x0078D7);
+        self.draw_text(x + 12, y + 6, "Volume & Storage Properties", 0xFFFFFF, 0x0078D7);
+        self.fill_rect(x + 1, y + 29, w - 2, h - 30, 0x1F242C);
+
+        let cur = fe.path_str();
+        self.draw_text(x + 16, y + 42, "Path:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 90, y + 42, cur, 0xFFFFFF, 0x1F242C);
+
+        let (fs_type, cap, used, free) = if cur.starts_with("C:") || cur.starts_with('/') {
+            ("VladFS v1.0 Primary", "32.0 MB", "7.8 MB", "24.2 MB")
+        } else if cur.starts_with("D:") {
+            ("FAT32 Secondary Data", "2.00 GB", "160 MB", "1.84 GB")
+        } else if cur.starts_with("E:") {
+            ("ISO9660 Optical Disc", "97.0 MB", "97.0 MB", "0 bytes")
+        } else {
+            ("FAT32 Removable USB", "32.0 GB", "3.4 GB", "28.6 GB")
+        };
+
+        self.draw_text(x + 16, y + 66, "File System:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 90, y + 66, fs_type, 0x00B7C3, 0x1F242C);
+
+        self.fill_rect(x + 16, y + 90, w - 32, 1, 0x2E3540);
+
+        self.draw_text(x + 16, y + 102, "Used space:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 110, y + 102, used, 0x4080FF, 0x1F242C);
+
+        self.draw_text(x + 16, y + 124, "Free space:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 110, y + 124, free, 0x76FF03, 0x1F242C);
+
+        self.draw_text(x + 16, y + 146, "Capacity:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 110, y + 146, cap, 0xFFFFFF, 0x1F242C);
+
+        self.fill_rect(x + 16, y + 172, w - 32, 14, 0x2A313C);
+        self.fill_rect(x + 16, y + 172, (w - 32) / 4, 14, 0x0078D7);
+
+        self.draw_text(x + 16, y + 196, "Attributes: Read, Write, Execute (Admin)", 0x88909D, 0x1F242C);
+
+        self.fill_rect(x + w - 90, y + h - 38, 74, 26, 0x0078D7);
+        self.draw_rect_outline(x + w - 90, y + h - 38, 74, 26, 0x1E90FF);
+        self.draw_text(x + w - 64, y + h - 32, "OK", 0xFFFFFF, 0x0078D7);
+    }
+
+    fn draw_photos_properties(&self, iv: &ImageViewerState) {
+        let w = 320;
+        let h = 230;
+        let x = (self.width.saturating_sub(w)) / 2;
+        let y = (self.height.saturating_sub(h)) / 2;
+
+        self.draw_window_shadow(x, y, w, h);
+        self.draw_rect_outline(x, y, w, h, 0x50D090);
+        self.fill_rect(x + 1, y + 1, w - 2, 28, 0x50D090);
+        self.draw_text(x + 12, y + 6, "File Properties", 0x101010, 0x50D090);
+        self.fill_rect(x + 1, y + 29, w - 2, h - 30, 0x1F242C);
+
+        self.draw_text(x + 16, y + 42, "File:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 70, y + 42, iv.path_str(), 0xFFFFFF, 0x1F242C);
+
+        self.draw_text(x + 16, y + 66, "Format:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 70, y + 66, iv.img_type, 0x00B7C3, 0x1F242C);
+
+        self.draw_text(x + 16, y + 90, "Size:", 0x7E8794, 0x1F242C);
+        self.draw_text(x + 70, y + 90, "1920 x 1080 (24-bit TrueColor)", 0xFFFFFF, 0x1F242C);
+
+        self.draw_text(x + 16, y + 114, "Rotation:", 0x7E8794, 0x1F242C);
+        let rot_str = match iv.rotation {
+            90 => "90 degrees Clockwise",
+            180 => "180 degrees",
+            270 => "270 degrees",
+            _ => "Normal (0 degrees)",
+        };
+        self.draw_text(x + 90, y + 114, rot_str, 0xCCD4E0, 0x1F242C);
+
+        self.draw_text(x + 16, y + 138, "Zoom:", 0x7E8794, 0x1F242C);
+        let zoom_str = match iv.zoom {
+            150 => "150%",
+            200 => "200%",
+            _ => "100% (Actual Size)",
+        };
+        self.draw_text(x + 70, y + 138, zoom_str, 0xCCD4E0, 0x1F242C);
+
+        self.fill_rect(x + w - 86, y + h - 36, 70, 24, 0x2E3540);
+        self.draw_rect_outline(x + w - 86, y + h - 36, 70, 24, 0x4A5260);
+        self.draw_text(x + w - 68, y + h - 32, "Close", 0xFFFFFF, 0x2E3540);
+    }
+
+    fn draw_notepad_menu(&self, np: &NotepadState) {
+        if let Some(menu_idx) = np.menu_open {
+            let wx = np.x;
+            let wy = np.y;
+            if menu_idx == 0 {
+                let mx = wx + 10;
+                let my = wy + 56;
+                let mw = 130;
+                let mh = 84;
+                self.draw_window_shadow(mx, my, mw, mh);
+                self.draw_rect_outline(mx, my, mw, mh, 0x3E3E3E);
+                self.fill_rect(mx + 1, my + 1, mw - 2, mh - 2, 0x1E1E1E);
+
+                self.draw_text(mx + 14, my + 8, "New        Ctrl+N", 0xEEEEEE, 0x1E1E1E);
+                self.draw_text(mx + 14, my + 30, "Save       Ctrl+S", 0xEEEEEE, 0x1E1E1E);
+                self.fill_rect(mx + 8, my + 52, mw - 16, 1, 0x333333);
+                self.draw_text(mx + 14, my + 60, "Exit", 0xEEEEEE, 0x1E1E1E);
+            } else if menu_idx == 1 {
+                let mx = wx + 50;
+                let my = wy + 56;
+                let mw = 130;
+                let mh = 62;
+                self.draw_window_shadow(mx, my, mw, mh);
+                self.draw_rect_outline(mx, my, mw, mh, 0x3E3E3E);
+                self.fill_rect(mx + 1, my + 1, mw - 2, mh - 2, 0x1E1E1E);
+
+                self.draw_text(mx + 14, my + 8, "Undo       Ctrl+Z", 0xEEEEEE, 0x1E1E1E);
+                self.draw_text(mx + 14, my + 30, "Select All Ctrl+A", 0xEEEEEE, 0x1E1E1E);
+            }
+        }
+    }
+
+    fn draw_notepad_about(&self, _np: &NotepadState) {
+        let w = 320;
+        let h = 180;
+        let x = (self.width.saturating_sub(w)) / 2;
+        let y = (self.height.saturating_sub(h)) / 2;
+
+        self.draw_window_shadow(x, y, w, h);
+        self.draw_rect_outline(x, y, w, h, 0x0078D7);
+        self.fill_rect(x + 1, y + 1, w - 2, 28, 0x0078D7);
+        self.draw_text(x + 12, y + 6, "About Notepad", 0xFFFFFF, 0x0078D7);
+        self.fill_rect(x + 1, y + 29, w - 2, h - 30, 0x1F242C);
+
+        self.draw_text(x + 16, y + 44, "VladOS Notepad v10.0", 0xFFFFFF, 0x1F242C);
+        self.draw_text(x + 16, y + 64, "(c) 2026 Vlad Corporation. All rights reserved.", 0x88909D, 0x1F242C);
+        self.draw_text(x + 16, y + 84, "Full read/write support for VladFS, FAT32.", 0xCCD4E0, 0x1F242C);
+
+        self.fill_rect(x + w - 86, y + h - 36, 70, 24, 0x0078D7);
+        self.draw_rect_outline(x + w - 86, y + h - 36, 70, 24, 0x1E90FF);
+        self.draw_text(x + w - 60, y + h - 32, "OK", 0xFFFFFF, 0x0078D7);
     }
 
     fn draw_context_menu(&self, ds: &DesktopState) {
@@ -1685,10 +2405,14 @@ impl Gfx {
 
         // System Tray on right
         let tray_x = self.width.saturating_sub(240);
-        self.draw_text(tray_x, tb_y + 12, "RUS", 0xA0A6B2, 0x101418);
-        self.draw_text(tray_x + 36, tb_y + 12, "[Vol]", 0x88909D, 0x101418);
-        self.draw_text(tray_x + 80, tb_y + 12, "[Net]", 0x0078D7, 0x101418);
-        self.draw_text(tray_x + 126, tb_y + 4, "19:20", 0xFFFFFF, 0x101418);
+        let lang_str = if ds.keyboard_lang == 0 { "RUS" } else { "ENG" };
+        self.draw_text(tray_x, tb_y + 12, lang_str, 0xA0A6B2, 0x101418);
+        let vol_col = if ds.volume_flyout_open { 0x0078D7 } else { 0x88909D };
+        self.draw_text(tray_x + 36, tb_y + 12, "[Vol]", vol_col, 0x101418);
+        let net_col = if ds.network_flyout_open { 0x00E5FF } else { 0x0078D7 };
+        self.draw_text(tray_x + 80, tb_y + 12, "[Net]", net_col, 0x101418);
+        let time_col = if ds.calendar_flyout_open { 0x0078D7 } else { 0xFFFFFF };
+        self.draw_text(tray_x + 126, tb_y + 4, "19:20", time_col, 0x101418);
         self.draw_text(tray_x + 120, tb_y + 20, "09/06/2026", 0x88909D, 0x101418);
 
         // Action Center Button at far right
@@ -1740,6 +2464,23 @@ impl Gfx {
             }
         }
 
+        if ds.np.open {
+            if ds.np.menu_open.is_some() {
+                self.draw_notepad_menu(&ds.np);
+            }
+            if ds.np.show_about {
+                self.draw_notepad_about(&ds.np);
+            }
+        }
+
+        if ds.fe.open && ds.fe.properties_open {
+            self.draw_explorer_properties(&ds.fe);
+        }
+
+        if ds.iv.open && ds.iv.properties_open {
+            self.draw_photos_properties(&ds.iv);
+        }
+
         if ds.start_menu_open {
             self.draw_start_menu();
         }
@@ -1750,6 +2491,18 @@ impl Gfx {
 
         if ds.context_menu_open {
             self.draw_context_menu(ds);
+        }
+
+        if ds.volume_flyout_open {
+            self.draw_volume_flyout(ds);
+        }
+
+        if ds.network_flyout_open {
+            self.draw_network_flyout(ds);
+        }
+
+        if ds.calendar_flyout_open {
+            self.draw_calendar_flyout(ds);
         }
 
         self.draw_taskbar(ds);
@@ -1937,7 +2690,20 @@ impl Gfx {
 
         // Toolbar
         self.fill_rect(wx + 1, wy + 32, ww.saturating_sub(2), 26, 0x242424);
-        self.draw_text(wx + 16, wy + 38, "Actual Size (100%)  |  Rotate  |  File Properties", 0xAAAAAA, 0x242424);
+        let zoom_lbl = match iv.zoom {
+            150 => "Zoom (150%)",
+            200 => "Zoom (200%)",
+            _ => "Actual Size (100%)",
+        };
+        self.draw_text(wx + 16, wy + 38, zoom_lbl, 0xFFFFFF, 0x242424);
+        let rot_lbl = match iv.rotation {
+            90 => "|  Rotate (90 deg)",
+            180 => "|  Rotate (180 deg)",
+            270 => "|  Rotate (270 deg)",
+            _ => "|  Rotate (0 deg)",
+        };
+        self.draw_text(wx + 180, wy + 38, rot_lbl, 0xCCD4E0, 0x242424);
+        self.draw_text(wx + 340, wy + 38, "|  File Properties", 0xCCD4E0, 0x242424);
 
         // Image Canvas
         let canvas_y = wy + 58;
@@ -2048,21 +2814,36 @@ impl Gfx {
             self.fill_rect(bx, by.saturating_sub(3), bar_w, 2, 0xFFFFFF);
         }
 
-        // Seek Bar
+        // Seek Bar with real progress
         let seek_y = viz_y + viz_h + 8;
         self.fill_rect(wx + 20, seek_y + 4, ww.saturating_sub(40), 6, 0x282432);
-        self.fill_rect(wx + 20, seek_y + 4, (ww.saturating_sub(40)) / 3, 6, 0xD080FF);
-        self.draw_text(wx + 20, seek_y + 14, "01:24 / 03:45", 0x888888, 0x181520);
+        let total_notes = match mp.track_idx { 0 => NOTES_AERO.len(), 1 => NOTES_STARTUP.len(), _ => NOTES_RETRO.len() };
+        let progress_w = ((ww.saturating_sub(40)) * (mp.note_idx + 1)) / total_notes.max(1);
+        self.fill_rect(wx + 20, seek_y + 4, progress_w, 6, 0xD080FF);
+
+        let mut time_buf = [0u8; 16];
+        let cur_s = mp.note_idx;
+        let tot_s = total_notes;
+        time_buf[0] = b'0' + (cur_s / 10) as u8;
+        time_buf[1] = b'0' + (cur_s % 10) as u8;
+        time_buf[2] = b' ';
+        time_buf[3] = b'/';
+        time_buf[4] = b' ';
+        time_buf[5] = b'0' + (tot_s / 10) as u8;
+        time_buf[6] = b'0' + (tot_s % 10) as u8;
+        let time_str = core::str::from_utf8(&time_buf[..7]).unwrap_or("00 / 20");
+        self.draw_text(wx + 20, seek_y + 14, time_str, 0x888888, 0x181520);
 
         // Controls bar
         let ctl_y = wy + wh.saturating_sub(44);
         self.fill_rect(wx + 1, ctl_y, ww.saturating_sub(2), 43, 0x181520);
-        self.draw_text(wx + 60, ctl_y + 12, "[ |<< ]", 0xCCCCCC, 0x181520);
+        self.draw_text(wx + 40, ctl_y + 12, "[ |<< ]", 0xCCCCCC, 0x181520);
         let play_txt = if mp.is_playing { "[ || Pause ]" } else { "[ > Play ]" };
-        self.draw_text(wx + 140, ctl_y + 12, play_txt, 0xFFFFFF, 0x181520);
-        self.draw_text(wx + 260, ctl_y + 12, "[ [] Stop ]", 0xCCCCCC, 0x181520);
-        self.draw_text(wx + 350, ctl_y + 12, "[ >>| ]", 0xCCCCCC, 0x181520);
-        self.draw_text(wx + 430, ctl_y + 12, "Vol: 100%", 0x00E5FF, 0x181520);
+        self.draw_text(wx + 110, ctl_y + 12, play_txt, 0xFFFFFF, 0x181520);
+        self.draw_text(wx + 230, ctl_y + 12, "[ [] Stop ]", 0xCCCCCC, 0x181520);
+        self.draw_text(wx + 330, ctl_y + 12, "[ >>| ]", 0xCCCCCC, 0x181520);
+        let vol_txt = if mp.is_muted { "[Muted]" } else if mp.volume == 100 { "[Vol: 100%]" } else { "[Vol: 50%]" };
+        self.draw_text(wx + 410, ctl_y + 12, vol_txt, 0x00E5FF, 0x181520);
     }
 
     fn draw_calculator(&self, calc: &CalculatorState, is_active: bool) {
@@ -2158,14 +2939,17 @@ impl Gfx {
         // 3. Ribbon Toolbar (Height: 32px)
         self.fill_rect(wx + 1, wy + 32, ww.saturating_sub(2), 32, 0x2B2B2B);
         self.draw_text(wx + 14, wy + 40, "File   Home   Share   View", 0xE0E0E0, 0x2B2B2B);
-        self.fill_rect(wx + 54, wy + 62, 38, 2, 0x0078D7); // Active tab line
-        self.draw_text(wx + 220, wy + 40, "[+ New folder]  [Delete]  [Properties]", 0x909090, 0x2B2B2B);
+        let tab_x = if fe.view_mode == 0 { wx + 14 } else { wx + 54 };
+        self.fill_rect(tab_x, wy + 62, 38, 2, 0x0078D7); // Active tab line
+        self.draw_text(wx + 220, wy + 40, "[+ New folder]  [Delete]  [Properties]", 0xCCCCCC, 0x2B2B2B);
 
         // 4. Address & Search Bar (Height: 34px)
         self.fill_rect(wx + 1, wy + 64, ww - 2, 34, 0x1F1F1F);
         // Nav buttons
-        self.draw_text(wx + 12, wy + 72, "<-", 0x0078D7, 0x1F1F1F);
-        self.draw_text(wx + 34, wy + 72, "->", 0x666666, 0x1F1F1F);
+        let back_col = if fe.history_pos > 0 { 0x0078D7 } else { 0x666666 };
+        let fwd_col = if fe.history_pos + 1 < fe.history_len { 0x0078D7 } else { 0x666666 };
+        self.draw_text(wx + 12, wy + 72, "<-", back_col, 0x1F1F1F);
+        self.draw_text(wx + 34, wy + 72, "->", fwd_col, 0x1F1F1F);
         self.draw_text(wx + 54, wy + 72, "^", 0x0078D7, 0x1F1F1F);
 
         // Breadcrumb Address Bar
@@ -2237,7 +3021,7 @@ impl Gfx {
 
         if fe.view_mode == 0 {
             // "This PC" Mode: Display logical drives with visual progress bars!
-            self.draw_text(main_x + 16, content_y + 12, "Devices and drives (3)", 0x888888, 0x101010);
+            self.draw_text(main_x + 16, content_y + 12, "Devices and drives (4)", 0x888888, 0x101010);
             self.fill_rect(main_x + 16, content_y + 30, main_w.saturating_sub(32), 1, 0x222222);
 
             // Drive C: Card (VladFS)
@@ -2310,6 +3094,7 @@ impl Gfx {
                 #[allow(static_mut_refs)]
                 if let Ok(list_str) = core::str::from_utf8(unsafe { &EXP_LIST_BUF[..n] }) {
                     let mut row_y = content_y + 28;
+                    let mut entry_idx = 0;
                     for line in list_str.lines() {
                         if row_y + 18 > content_y + content_h {
                             break;
@@ -2337,6 +3122,12 @@ impl Gfx {
                                     }
                                 }
 
+                                let is_selected = fe.selected_idx == Some(entry_idx);
+                                if is_selected {
+                                    self.fill_rect(main_x + 4, row_y - 2, main_w.saturating_sub(8), 18, 0x1E293B);
+                                    self.fill_rect(main_x + 4, row_y - 2, 3, 18, 0x0078D7);
+                                }
+
                                 let (icon, item_type, name_color) = if is_dir {
                                     ("[DIR]", "File folder", 0xFFD040)
                                 } else if name.ends_with(".sys") {
@@ -2353,14 +3144,16 @@ impl Gfx {
                                     ("[TXT]", "Text Document", 0xEEEEEE)
                                 };
 
-                                self.draw_text(main_x + 16, row_y, icon, name_color, 0x101010);
-                                self.draw_text(main_x + 60, row_y, name, name_color, 0x101010);
-                                self.draw_text(main_x + 190, row_y, item_type, 0x888888, 0x101010);
-                                self.draw_text(main_x + 310, row_y, size, 0x888888, 0x101010);
-                                self.draw_text(main_x + 380, row_y, owner, 0x888888, 0x101010);
-                                self.draw_text(main_x + 460, row_y, perm, 0x666666, 0x101010);
+                                let bg = if is_selected { 0x1E293B } else { 0x101010 };
+                                self.draw_text(main_x + 16, row_y, icon, name_color, bg);
+                                self.draw_text(main_x + 60, row_y, name, name_color, bg);
+                                self.draw_text(main_x + 190, row_y, item_type, 0x888888, bg);
+                                self.draw_text(main_x + 310, row_y, size, 0x888888, bg);
+                                self.draw_text(main_x + 380, row_y, owner, 0x888888, bg);
+                                self.draw_text(main_x + 460, row_y, perm, 0x666666, bg);
 
                                 row_y += 20;
+                                entry_idx += 1;
                             }
                         }
                     }
@@ -2375,7 +3168,9 @@ impl Gfx {
         self.fill_rect(wx + 1, status_y, ww - 2, 23, 0x181818);
         self.fill_rect(wx + 1, status_y, ww - 2, 1, 0x282828);
         let status_msg = if fe.view_mode == 0 {
-            "3 drives available | VladFS, FAT32, ISO9660 active | System Healthy"
+            "4 storage volumes | VladFS, FAT32, ISO9660, USB | System Healthy"
+        } else if fe.selected_idx.is_some() {
+            "1 item selected | Click [Delete] to remove, or click again to launch"
         } else {
             "Folder View Active | RBAC Access: Authenticated (Vlad / Administrator)"
         };
@@ -2633,6 +3428,7 @@ impl TerminalState {
             let cmd = cmd.trim();
             if eq_ignore_ascii_case(cmd, "help") {
                 self.add_line("VladOS Command Prompt Reference:");
+                self.add_line("START <app>  - Launch any .vex binary or application");
                 self.add_line("DIR [path]   - List directory (VladFS C:, FAT32 D:, ISO E:, USB U:)");
                 self.add_line("DRIVES       - List all mounted volumes");
                 self.add_line("RESCAN       - Hardware PCI & USB bus auto-detection");
@@ -2641,18 +3437,12 @@ impl TerminalState {
                 self.add_line("PLAY [file]  - Launch Windows Media Player (MP3/WAV/MP4)");
                 self.add_line("VIEW [file]  - Launch Photos image viewer (BMP/PNG/JPG)");
                 self.add_line("EXPLORER     - Bring File Explorer to front");
-                self.add_line("MENU         - Toggle Start Menu");
-                self.add_line("WHOAMI       - Display current user context and SID");
-                self.add_line("SU <user>    - Switch user (SYSTEM, Vlad, User, Guest)");
-                self.add_line("TYPE <file>  - Display contents of a text file");
-                self.add_line("ECHO txt [> f]- Print text or write to file");
-                self.add_line("MKDIR <path> - Create a new directory");
-                self.add_line("DEL <path>   - Delete a file");
-                self.add_line("REN <o> <n>  - Rename file or directory");
-                self.add_line("CHMOD <m> <p>- Change file permissions");
-                self.add_line("SYSINFO      - Hardware & OS specifications");
-                self.add_line("CLS          - Clear screen");
-                self.add_line("EXIT         - Close CMD window");
+                self.add_line("BEEP [f] [d] - Play sound tone on PC speaker");
+                self.add_line("MUTE / VOL   - Audio volume control");
+                self.add_line("SHUTDOWN     - ACPI power off");
+                self.add_line("RESTART      - 8042 system reset");
+                self.add_line("WHOAMI / SU  - Security context & user management");
+                self.add_line("CLS / EXIT   - Terminal control");
             } else if eq_ignore_ascii_case(cmd, "ver") {
                 self.add_line("VladOS [Version 10.0.19045.3803]");
                 self.add_line("(c) 2026 Vlad Inc. All rights reserved.");
@@ -2929,11 +3719,174 @@ impl TerminalState {
                         self.add_line(echo_str);
                     }
                 }
+            } else if starts_with_ignore_case(cmd, "start ") || starts_with_ignore_case(cmd, "run ") {
+                let target = if starts_with_ignore_case(cmd, "start ") {
+                    cmd[6..].trim()
+                } else {
+                    cmd[4..].trim()
+                };
+                launch_vex(target, ds, self);
+                if ds.fe.open || ds.cmd_open || ds.calc.open || ds.np.open || ds.mp.open || ds.iv.open {
+                    gfx.render_windows(ds, self);
+                }
+            } else if eq_ignore_ascii_case(cmd, "calc.vex") {
+                launch_vex("calc.vex", ds, self);
+                gfx.render_windows(ds, self);
+            } else if eq_ignore_ascii_case(cmd, "notepad.vex") {
+                launch_vex("notepad.vex", ds, self);
+                gfx.render_windows(ds, self);
+            } else if eq_ignore_ascii_case(cmd, "player.vex") || eq_ignore_ascii_case(cmd, "wmplayer") || eq_ignore_ascii_case(cmd, "wmplayer.vex") {
+                launch_vex("player.vex", ds, self);
+                gfx.render_windows(ds, self);
+            } else if eq_ignore_ascii_case(cmd, "photos.vex") {
+                launch_vex("photos.vex", ds, self);
+                gfx.render_windows(ds, self);
+            } else if eq_ignore_ascii_case(cmd, "cmd.vex") {
+                launch_vex("cmd.vex", ds, self);
+                gfx.render_windows(ds, self);
+            } else if eq_ignore_ascii_case(cmd, "explorer.vex") {
+                launch_vex("explorer.vex", ds, self);
+                gfx.render_windows(ds, self);
+            } else if cmd.ends_with(".vex") || cmd.ends_with(".lnk") {
+                launch_vex(cmd, ds, self);
+                gfx.render_windows(ds, self);
+            } else if starts_with_ignore_case(cmd, "beep") {
+                let rest = if starts_with_ignore_case(cmd, "beep ") { cmd[5..].trim() } else { "" };
+                let mut parts = rest.split_ascii_whitespace();
+                let freq = parts.next().and_then(|s| s.parse::<usize>().ok()).unwrap_or(880);
+                let dur = parts.next().and_then(|s| s.parse::<usize>().ok()).unwrap_or(100);
+                unsafe { sys_beep(freq as u32, dur as u32) };
+                self.add_line("[Sound: PC Speaker BEEP played]");
+            } else if eq_ignore_ascii_case(cmd, "mute") {
+                unsafe { sys_beep(0, 0) };
+                ds.mp.is_muted = true;
+                self.add_line("[Audio muted]");
+            } else if starts_with_ignore_case(cmd, "vol ") {
+                let val = cmd[4..].trim().parse::<usize>().unwrap_or(80);
+                ds.mp.set_volume(val);
+                self.add_line("[Volume set]");
+            } else if eq_ignore_ascii_case(cmd, "shutdown") || eq_ignore_ascii_case(cmd, "poweroff") {
+                self.add_line("[System: Powering off via ACPI...]");
+                unsafe { sys_power(0) };
+            } else if eq_ignore_ascii_case(cmd, "restart") || eq_ignore_ascii_case(cmd, "reboot") {
+                self.add_line("[System: Restarting via 8042 reset...]");
+                unsafe { sys_power(1) };
             } else {
                 self.add_line("Command not recognized. Type HELP for command list.");
             }
         }
         self.input_len = 0;
+    }
+}
+
+fn launch_vex(path: &str, ds: &mut DesktopState, term: &mut TerminalState) {
+    let clean = path.trim();
+    let name = if let Some(idx) = clean.rfind('\\').or_else(|| clean.rfind('/')) {
+        &clean[idx + 1..]
+    } else {
+        clean
+    };
+
+    if eq_ignore_ascii_case(name, "calc.vex") || eq_ignore_ascii_case(name, "calc") {
+        ds.calc.open = true;
+        ds.bring_to_front(3);
+        term.add_line("[Started Calculator: calc.vex]");
+    } else if eq_ignore_ascii_case(name, "notepad.vex") || eq_ignore_ascii_case(name, "notepad") {
+        ds.np.open = true;
+        ds.bring_to_front(2);
+        term.add_line("[Started Notepad: notepad.vex]");
+    } else if eq_ignore_ascii_case(name, "player.vex")
+        || eq_ignore_ascii_case(name, "wmplayer.vex")
+        || eq_ignore_ascii_case(name, "player")
+        || eq_ignore_ascii_case(name, "play")
+    {
+        ds.mp.open = true;
+        ds.bring_to_front(5);
+        ds.mp.play();
+        term.add_line("[Started Media Player: player.vex]");
+    } else if eq_ignore_ascii_case(name, "photos.vex")
+        || eq_ignore_ascii_case(name, "view.vex")
+        || eq_ignore_ascii_case(name, "photos")
+        || eq_ignore_ascii_case(name, "view")
+    {
+        ds.iv.open = true;
+        ds.bring_to_front(4);
+        term.add_line("[Started Photos: photos.vex]");
+    } else if eq_ignore_ascii_case(name, "explorer.vex") || eq_ignore_ascii_case(name, "explorer") {
+        ds.fe.open = true;
+        ds.bring_to_front(1);
+        term.add_line("[Started File Explorer: explorer.vex]");
+    } else if eq_ignore_ascii_case(name, "cmd.vex") || eq_ignore_ascii_case(name, "cmd") {
+        ds.cmd_open = true;
+        ds.bring_to_front(0);
+        term.add_line("[Started Command Prompt: cmd.vex]");
+    } else if eq_ignore_ascii_case(name, "control panel.lnk")
+        || eq_ignore_ascii_case(name, "control.lnk")
+        || eq_ignore_ascii_case(name, "control")
+    {
+        ds.cmd_open = true;
+        ds.bring_to_front(0);
+        term.add_line("VladOS 10 Control Panel - System & Security");
+        term.add_line("Hardware: 64-bit AMD64/Intel x86_64, UEFI 2.7, ACPI 2.0");
+        term.add_line("Audio: Realtek High Definition Audio (PC Speaker DAC)");
+        term.add_line("Display: 1024x768x32bpp TrueColor Direct Framebuffer");
+    } else if eq_ignore_ascii_case(name, "calculator.lnk") {
+        ds.calc.open = true;
+        ds.bring_to_front(3);
+        term.add_line("[Shortcut: Calculator opened]");
+    } else if eq_ignore_ascii_case(name, "command prompt.lnk") {
+        ds.cmd_open = true;
+        ds.bring_to_front(0);
+        term.add_line("[Shortcut: Command Prompt opened]");
+    } else if eq_ignore_ascii_case(name, "file explorer.lnk") {
+        ds.fe.open = true;
+        ds.bring_to_front(1);
+        term.add_line("[Shortcut: File Explorer opened]");
+    } else if eq_ignore_ascii_case(name, "notepad.lnk") {
+        ds.np.open = true;
+        ds.bring_to_front(2);
+        term.add_line("[Shortcut: Notepad opened]");
+    } else if eq_ignore_ascii_case(name, "media player.lnk") {
+        ds.mp.open = true;
+        ds.bring_to_front(5);
+        ds.mp.play();
+        term.add_line("[Shortcut: Media Player opened]");
+    } else if eq_ignore_ascii_case(name, "photos.lnk") {
+        ds.iv.open = true;
+        ds.bring_to_front(4);
+        term.add_line("[Shortcut: Photos opened]");
+    } else if eq_ignore_ascii_case(name, "this pc.lnk") {
+        ds.fe.open = true;
+        ds.fe.view_mode = 0;
+        ds.fe.set_path("This PC");
+        ds.bring_to_front(1);
+        term.add_line("[Shortcut: This PC opened]");
+    } else if name.ends_with(".bmp") || name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg") {
+        ds.iv.open_image(clean);
+        ds.bring_to_front(4);
+        term.add_line("[Photos opened image]");
+    } else if name.ends_with(".mp3") || name.ends_with(".wav") || name.ends_with(".mp4") || name.ends_with(".avi") {
+        ds.mp.open_media(clean);
+        ds.bring_to_front(5);
+        term.add_line("[Media Player playing media]");
+    } else if name.ends_with(".txt") || name.ends_with(".ini") || name.ends_with(".cfg") || name.ends_with(".sys") || name.ends_with(".log") {
+        ds.np.open_file(clean);
+        ds.bring_to_front(2);
+        term.add_line("[Notepad opened document]");
+    } else {
+        // Arbitrary VEX binary or document on disk
+        let mut header = [0u8; 16];
+        let n = unsafe { sys_vfs_read(clean, &mut header) };
+        if n >= 4 && header[0..4] == [0x7F, b'E', b'L', b'F'] {
+            term.add_line("[Process Created: Windows Subsystem GUI / VEX-64]");
+            term.add_line("Process ID: 112 | Subsystem: GUI | Status: Running");
+        } else if n > 0 {
+            ds.np.open_file(clean);
+            ds.bring_to_front(2);
+            term.add_line("[Notepad opened document]");
+        } else {
+            term.add_line("The system cannot find the file specified or format unknown.");
+        }
     }
 }
 
@@ -2994,17 +3947,14 @@ fn handle_mouse_click(
                     term.add_line("[Context Menu: Sort by Name]");
                 }
                 2 => {
-                    // Refresh
                     term.add_line("[Context Menu: Desktop Refreshed]");
                     gfx.draw_desktop();
                 }
                 3 => {
-                    // New folder on Desktop
                     unsafe { sys_vfs_mkdir("C:\\Users\\Vlad\\Desktop\\New Folder") };
                     term.add_line("[Context Menu: Created Desktop\\New Folder]");
                 }
                 4 => {
-                    // New Text Document
                     unsafe { sys_vfs_write("C:\\Users\\Vlad\\Desktop\\New Document.txt", b"New text document.") };
                     term.add_line("[Context Menu: Created Desktop\\New Document.txt]");
                 }
@@ -3028,8 +3978,6 @@ fn handle_mouse_click(
         let ac_x = gfx.width.saturating_sub(ac_w);
         let ac_h = tb_y;
         if mx >= ac_x && my < tb_y {
-            // Click inside action center!
-            // Quick action tiles: y: ac_h - 130 .. ac_h - 10
             let tiles_top = ac_h.saturating_sub(130);
             if my >= tiles_top && my < ac_h.saturating_sub(10) {
                 let rel_y = my - tiles_top;
@@ -3045,21 +3993,198 @@ fn handle_mouse_click(
                     }
                 }
             }
-            // "Clear all notifications" button
             if mx >= ac_x + 200 && my >= 10 && my <= 32 {
                 term.add_line("[Action Center: Notifications Cleared]");
             }
             gfx.draw_action_center(ds);
             return;
         } else {
-            // Dismiss action center if clicking outside
             ds.action_center_open = false;
             gfx.redraw_wallpaper_rect(ac_x, 0, ac_w, ac_h);
             gfx.render_windows(ds, term);
-            // If click was on taskbar tray action center icon, we're toggling it off so just return
             if my >= tb_y && mx >= gfx.width.saturating_sub(40) {
                 return;
             }
+        }
+    }
+
+    // 0c. Volume Flyout Interaction
+    if ds.volume_flyout_open {
+        let vf_w = 300;
+        let vf_h = 130;
+        let vf_x = gfx.width.saturating_sub(vf_w + 10);
+        let vf_y = tb_y.saturating_sub(vf_h + 10);
+        if mx >= vf_x && mx < vf_x + vf_w && my >= vf_y && my < vf_y + vf_h {
+            let slider_x = vf_x + 60;
+            let slider_y = vf_y + 80;
+            let slider_w = 170;
+            if mx >= slider_x && mx <= slider_x + slider_w && my >= slider_y.saturating_sub(8) && my <= slider_y + 32 {
+                let rel_x = (mx.saturating_sub(slider_x)).min(slider_w);
+                let new_vol = (rel_x * 100) / slider_w;
+                ds.mp.set_volume(new_vol);
+                term.add_line("[Volume adjusted]");
+            }
+            let mute_x = vf_x + 16;
+            let mute_y = vf_y + 76;
+            if mx >= mute_x && mx <= mute_x + 36 && my >= mute_y && my <= mute_y + 32 {
+                ds.mp.toggle_mute();
+                term.add_line("[Volume mute toggled]");
+            }
+            gfx.draw_volume_flyout(ds);
+            return;
+        } else {
+            ds.volume_flyout_open = false;
+            gfx.redraw_wallpaper_rect(vf_x, vf_y, vf_w, vf_h);
+            gfx.render_windows(ds, term);
+            let tray_x = gfx.width.saturating_sub(240);
+            if my >= tb_y && mx >= tray_x + 34 && mx <= tray_x + 76 {
+                return;
+            }
+        }
+    }
+
+    // 0d. Network Flyout Interaction
+    if ds.network_flyout_open {
+        let nf_w = 320;
+        let nf_h = 260;
+        let nf_x = gfx.width.saturating_sub(nf_w + 10);
+        let nf_y = tb_y.saturating_sub(nf_h + 10);
+        if mx >= nf_x && mx < nf_x + nf_w && my >= nf_y && my < nf_y + nf_h {
+            term.add_line("[Network: VladNet Ethernet Connected (1000 Mbps)]");
+            gfx.draw_network_flyout(ds);
+            return;
+        } else {
+            ds.network_flyout_open = false;
+            gfx.redraw_wallpaper_rect(nf_x, nf_y, nf_w, nf_h);
+            gfx.render_windows(ds, term);
+            let tray_x = gfx.width.saturating_sub(240);
+            if my >= tb_y && mx >= tray_x + 78 && mx <= tray_x + 118 {
+                return;
+            }
+        }
+    }
+
+    // 0e. Calendar Flyout Interaction
+    if ds.calendar_flyout_open {
+        let cf_w = 320;
+        let cf_h = 380;
+        let cf_x = gfx.width.saturating_sub(cf_w + 10);
+        let cf_y = tb_y.saturating_sub(cf_h + 10);
+        if mx >= cf_x && mx < cf_x + cf_w && my >= cf_y && my < cf_y + cf_h {
+            term.add_line("[Calendar: Sunday, September 6, 2026]");
+            gfx.draw_calendar_flyout(ds);
+            return;
+        } else {
+            ds.calendar_flyout_open = false;
+            gfx.redraw_wallpaper_rect(cf_x, cf_y, cf_w, cf_h);
+            gfx.render_windows(ds, term);
+            let tray_x = gfx.width.saturating_sub(240);
+            if my >= tb_y && mx >= tray_x + 120 && mx < gfx.width.saturating_sub(40) {
+                return;
+            }
+        }
+    }
+
+    // 0f. Explorer Properties Modal
+    if ds.fe.open && ds.fe.properties_open {
+        let w = 340;
+        let h = 280;
+        let x = (gfx.width.saturating_sub(w)) / 2;
+        let y = (gfx.height.saturating_sub(h)) / 2;
+        let ok_x = x + w - 90;
+        let ok_y = y + h - 38;
+        if (mx >= ok_x && mx <= ok_x + 74 && my >= ok_y && my <= ok_y + 26)
+            || !(mx >= x && mx < x + w && my >= y && my < y + h)
+        {
+            ds.fe.properties_open = false;
+            gfx.redraw_wallpaper_rect(x.saturating_sub(6), y.saturating_sub(6), w + 12, h + 12);
+            gfx.render_windows(ds, term);
+            return;
+        }
+        return;
+    }
+
+    // 0g. Photos Properties Modal
+    if ds.iv.open && ds.iv.properties_open {
+        let w = 320;
+        let h = 230;
+        let x = (gfx.width.saturating_sub(w)) / 2;
+        let y = (gfx.height.saturating_sub(h)) / 2;
+        let ok_x = x + w - 86;
+        let ok_y = y + h - 36;
+        if (mx >= ok_x && mx <= ok_x + 70 && my >= ok_y && my <= ok_y + 24)
+            || !(mx >= x && mx < x + w && my >= y && my < y + h)
+        {
+            ds.iv.properties_open = false;
+            gfx.redraw_wallpaper_rect(x.saturating_sub(6), y.saturating_sub(6), w + 12, h + 12);
+            gfx.render_windows(ds, term);
+            return;
+        }
+        return;
+    }
+
+    // 0h. Notepad About Dialog
+    if ds.np.open && ds.np.show_about {
+        let w = 320;
+        let h = 180;
+        let x = (gfx.width.saturating_sub(w)) / 2;
+        let y = (gfx.height.saturating_sub(h)) / 2;
+        let ok_x = x + w - 86;
+        let ok_y = y + h - 36;
+        if (mx >= ok_x && mx <= ok_x + 70 && my >= ok_y && my <= ok_y + 24)
+            || !(mx >= x && mx < x + w && my >= y && my < y + h)
+        {
+            ds.np.show_about = false;
+            gfx.redraw_wallpaper_rect(x.saturating_sub(6), y.saturating_sub(6), w + 12, h + 12);
+            gfx.render_windows(ds, term);
+            return;
+        }
+        return;
+    }
+
+    // 0i. Notepad Dropdown Menus
+    if ds.np.open && ds.np.menu_open.is_some() {
+        let wx = ds.np.x;
+        let wy = ds.np.y;
+        let mut handled = false;
+        if ds.np.menu_open == Some(0) {
+            let menu_x = wx + 10;
+            let menu_y = wy + 56;
+            let menu_w = 130;
+            let menu_h = 84;
+            if mx >= menu_x && mx <= menu_x + menu_w && my >= menu_y && my <= menu_y + menu_h {
+                let rel_y = my - menu_y;
+                if rel_y < 28 {
+                    ds.np.clear();
+                    term.add_line("[Notepad: New document created]");
+                } else if rel_y < 54 {
+                    ds.np.save_file();
+                    term.add_line("[Notepad: File saved to disk]");
+                } else {
+                    ds.np.open = false;
+                    term.add_line("[Notepad: Closed]");
+                }
+                handled = true;
+            }
+        } else if ds.np.menu_open == Some(1) {
+            let menu_x = wx + 50;
+            let menu_y = wy + 56;
+            let menu_w = 130;
+            let menu_h = 62;
+            if mx >= menu_x && mx <= menu_x + menu_w && my >= menu_y && my <= menu_y + menu_h {
+                let rel_y = my - menu_y;
+                if rel_y < 30 {
+                    term.add_line("[Notepad: Undo]");
+                } else {
+                    term.add_line("[Notepad: Select All]");
+                }
+                handled = true;
+            }
+        }
+        ds.np.menu_open = None;
+        gfx.draw_notepad(&ds.np, ds.focus == 2);
+        if handled {
+            return;
         }
     }
 
@@ -3080,8 +4205,8 @@ fn handle_mouse_click(
     }
 
     // 2. Taskbar App Icons
-    // 2a. CMD Button (x: 232..276)
     if my >= tb_y && mx >= 232 && mx <= 276 {
+        // CMD Button
         if ds.cmd_open && ds.focus == 0 {
             ds.cmd_open = false;
             let (wx, wy, ww, wh) = ds.get_rect(0);
@@ -3096,8 +4221,8 @@ fn handle_mouse_click(
         return;
     }
 
-    // 2b. File Explorer Button (x: 282..326)
     if my >= tb_y && mx >= 282 && mx <= 326 {
+        // File Explorer Button
         if ds.fe.open && ds.focus == 1 {
             ds.fe.open = false;
             let (wx, wy, ww, wh) = ds.get_rect(1);
@@ -3112,8 +4237,8 @@ fn handle_mouse_click(
         return;
     }
 
-    // 2c. Notepad Button (x: 332..376)
     if my >= tb_y && mx >= 332 && mx <= 376 {
+        // Notepad Button
         if ds.np.open && ds.focus == 2 {
             ds.np.open = false;
             let (wx, wy, ww, wh) = ds.get_rect(2);
@@ -3128,8 +4253,8 @@ fn handle_mouse_click(
         return;
     }
 
-    // 2d. Calculator Button (x: 382..426)
     if my >= tb_y && mx >= 382 && mx <= 426 {
+        // Calculator Button
         if ds.calc.open && ds.focus == 3 {
             ds.calc.open = false;
             let (wx, wy, ww, wh) = ds.get_rect(3);
@@ -3144,8 +4269,8 @@ fn handle_mouse_click(
         return;
     }
 
-    // 2e. Media Player Button (x: 432..476)
     if my >= tb_y && mx >= 432 && mx <= 476 {
+        // Media Player Button
         if ds.mp.open && ds.focus == 5 {
             ds.mp.open = false;
             let (wx, wy, ww, wh) = ds.get_rect(5);
@@ -3154,14 +4279,15 @@ fn handle_mouse_click(
         } else {
             ds.mp.open = true;
             ds.bring_to_front(5);
+            ds.mp.play();
             term.add_line("[Taskbar: Media Player activated]");
         }
         gfx.render_windows(ds, term);
         return;
     }
 
-    // 2f. Photos Button (x: 482..526)
     if my >= tb_y && mx >= 482 && mx <= 526 {
+        // Photos Button
         if ds.iv.open && ds.focus == 4 {
             ds.iv.open = false;
             let (wx, wy, ww, wh) = ds.get_rect(4);
@@ -3176,9 +4302,52 @@ fn handle_mouse_click(
         return;
     }
 
-    // 2g. Action Center Toggle Button (rightmost taskbar icon, x: width - 40 .. width)
+    // 2b. Taskbar System Tray Items
+    let tray_x = gfx.width.saturating_sub(240);
+    if my >= tb_y && mx >= tray_x && mx < tray_x + 32 {
+        // Language Toggle: RUS / ENG
+        ds.keyboard_lang = if ds.keyboard_lang == 0 { 1 } else { 0 };
+        term.add_line(if ds.keyboard_lang == 1 { "[Language switched to RUS]" } else { "[Language switched to ENG]" });
+        gfx.draw_taskbar(ds);
+        return;
+    }
+
+    if my >= tb_y && mx >= tray_x + 34 && mx <= tray_x + 76 {
+        // Volume Flyout Toggle
+        ds.volume_flyout_open = !ds.volume_flyout_open;
+        ds.network_flyout_open = false;
+        ds.calendar_flyout_open = false;
+        ds.action_center_open = false;
+        gfx.render_windows(ds, term);
+        return;
+    }
+
+    if my >= tb_y && mx >= tray_x + 78 && mx <= tray_x + 118 {
+        // Network Flyout Toggle
+        ds.network_flyout_open = !ds.network_flyout_open;
+        ds.volume_flyout_open = false;
+        ds.calendar_flyout_open = false;
+        ds.action_center_open = false;
+        gfx.render_windows(ds, term);
+        return;
+    }
+
+    if my >= tb_y && mx >= tray_x + 120 && mx < gfx.width.saturating_sub(40) {
+        // Clock / Calendar Flyout Toggle
+        ds.calendar_flyout_open = !ds.calendar_flyout_open;
+        ds.volume_flyout_open = false;
+        ds.network_flyout_open = false;
+        ds.action_center_open = false;
+        gfx.render_windows(ds, term);
+        return;
+    }
+
     if my >= tb_y && mx >= gfx.width.saturating_sub(40) {
+        // Action Center Toggle
         ds.action_center_open = !ds.action_center_open;
+        ds.volume_flyout_open = false;
+        ds.network_flyout_open = false;
+        ds.calendar_flyout_open = false;
         if ds.action_center_open {
             gfx.draw_action_center(ds);
             term.add_line("[Action Center opened]");
@@ -3197,8 +4366,32 @@ fn handle_mouse_click(
         let sm_h = 440;
         let sm_y = tb_y.saturating_sub(sm_h);
         if mx < 340 && my >= sm_y && my < tb_y {
+            // Left rail: User Avatar 'V'
+            if mx >= 12 && mx <= 36 && my >= sm_y + 54 && my <= sm_y + 78 {
+                term.add_line("[User Profile: Vlad (Administrator) - Full Permissions]");
+                gfx.render_windows(ds, term);
+                return;
+            }
+            // Left rail: Power Icon
+            if mx >= 12 && mx <= 36 && my >= tb_y.saturating_sub(38) && my <= tb_y.saturating_sub(14) {
+                term.add_line("[System: Powering off via ACPI...]");
+                unsafe { sys_power(0) };
+                return;
+            }
+            // Bottom Action: Shut Down Button
+            if mx >= 60 && mx <= 180 && my >= sm_y + 392 && my <= sm_y + 420 {
+                term.add_line("[System: Shutting down via ACPI...]");
+                unsafe { sys_power(0) };
+                return;
+            }
+            // Bottom Action: Restart Button
+            if mx >= 190 && mx <= 310 && my >= sm_y + 392 && my <= sm_y + 420 {
+                term.add_line("[System: Restarting via 8042 reset...]");
+                unsafe { sys_power(1) };
+                return;
+            }
             // Tile 1: CMD
-            if mx >= 48 && mx <= 148 && my >= sm_y + 80 && my <= sm_y + 150 {
+            if mx >= 60 && mx <= 186 && my >= sm_y + 82 && my <= sm_y + 150 {
                 ds.cmd_open = true;
                 ds.bring_to_front(0);
                 gfx.render_windows(ds, term);
@@ -3206,7 +4399,7 @@ fn handle_mouse_click(
                 return;
             }
             // Tile 2: SysInfo
-            else if mx >= 152 && mx <= 252 && my >= sm_y + 80 && my <= sm_y + 150 {
+            if mx >= 194 && mx <= 320 && my >= sm_y + 82 && my <= sm_y + 150 {
                 ds.cmd_open = true;
                 ds.bring_to_front(0);
                 term.add_line("C:\\VladOS\\System32> sysinfo");
@@ -3214,12 +4407,13 @@ fn handle_mouse_click(
                 term.add_line("OS Name:                   VladOS 10 Professional");
                 term.add_line("Architecture:              x86_64 Long Mode (64-bit)");
                 term.add_line("Desktop Shell:             explorer.vex (Windows 10 Fluent Dark)");
+                term.add_line("Audio Subsystem:           Realtek HD Audio (PC Speaker Sound Engine)");
                 term.add_line("Storage / VFS:             VladFS (C:) + FAT32 (D:) + ISO (E:) + USB (U:)");
                 gfx.render_windows(ds, term);
                 return;
             }
             // Tile 3: Files -> Open File Explorer at C:\VladOS
-            else if mx >= 48 && mx <= 148 && my >= sm_y + 155 && my <= sm_y + 225 {
+            if mx >= 60 && mx <= 186 && my >= sm_y + 158 && my <= sm_y + 226 {
                 ds.fe.open = true;
                 ds.fe.view_mode = 1;
                 ds.fe.set_path("C:\\VladOS");
@@ -3229,7 +4423,7 @@ fn handle_mouse_click(
                 return;
             }
             // Tile 4: Storage -> Open File Explorer at This PC
-            else if mx >= 152 && mx <= 252 && my >= sm_y + 155 && my <= sm_y + 225 {
+            if mx >= 194 && mx <= 320 && my >= sm_y + 158 && my <= sm_y + 226 {
                 ds.fe.open = true;
                 ds.fe.view_mode = 0;
                 ds.fe.set_path("This PC");
@@ -3239,7 +4433,7 @@ fn handle_mouse_click(
                 return;
             }
             // App List Clicks
-            else if my >= sm_y + 255 && my <= sm_y + 375 {
+            if my >= sm_y + 255 && my <= sm_y + 380 {
                 let row = (my - (sm_y + 255)) / 22;
                 match row {
                     0 => {
@@ -3261,6 +4455,7 @@ fn handle_mouse_click(
                     4 => {
                         ds.mp.open = true;
                         ds.bring_to_front(5);
+                        ds.mp.play();
                     }
                     _ => {}
                 }
@@ -3268,7 +4463,6 @@ fn handle_mouse_click(
                 return;
             }
         } else {
-            // Dismiss Start Menu if clicking outside
             ds.start_menu_open = false;
             gfx.redraw_wallpaper_rect(0, sm_y, 342, sm_h);
             gfx.render_windows(ds, term);
@@ -3282,7 +4476,6 @@ fn handle_mouse_click(
         }
         let (wx, wy, ww, wh) = ds.get_rect(w_idx);
         if mx >= wx && mx < wx + ww && my >= wy && my < wy + wh {
-            // Bring clicked window to top
             ds.bring_to_front(w_idx);
 
             // Titlebar Clicks (y: wy .. wy + 32)
@@ -3290,6 +4483,9 @@ fn handle_mouse_click(
                 // Close button [X]
                 if mx >= wx + ww.saturating_sub(46) {
                     ds.set_open(w_idx, false);
+                    if w_idx == 5 {
+                        ds.mp.stop();
+                    }
                     gfx.redraw_wallpaper_rect(wx.saturating_sub(6), wy.saturating_sub(6), ww + 12, wh + 12);
                     gfx.render_windows(ds, term);
                     term.add_line("[Window Closed]");
@@ -3343,7 +4539,7 @@ fn handle_mouse_click(
 
             // Client area routing:
             if w_idx == 3 {
-                // Calculator buttons grid
+                // Calculator buttons grid (5 rows x 4 cols)
                 if mx >= wx + 10 && mx < wx + 10 + 4 * 74 && my >= wy + 104 && my < wy + 104 + 5 * 62 {
                     let col = (mx - (wx + 10)) / 74;
                     let row = (my - (wy + 104)) / 62;
@@ -3357,13 +4553,16 @@ fn handle_mouse_click(
                     if row < 5 && col < 4 {
                         let b = btns[row][col];
                         match b {
-                            "C" | "CE" => ds.calc.clear(),
+                            "C" => ds.calc.clear(),
+                            "CE" => ds.calc.clear_entry(),
+                            "+/-" => ds.calc.toggle_sign(),
+                            "." => ds.calc.press_dot(),
+                            "%" => ds.calc.press_percent(),
                             "=" => ds.calc.eval(),
                             "+" => ds.calc.press_op('+'),
                             "-" => ds.calc.press_op('-'),
                             "*" => ds.calc.press_op('*'),
                             "/" => ds.calc.press_op('/'),
-                            "%" => ds.calc.press_op('%'),
                             "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" => {
                                 ds.calc.press_digit(b.as_bytes()[0]);
                             }
@@ -3374,23 +4573,135 @@ fn handle_mouse_click(
                     }
                 }
             } else if w_idx == 5 {
-                // Media Player buttons
-                if my >= wy + wh.saturating_sub(44) && my <= wy + wh {
-                    if mx >= wx + 130 && mx <= wx + 240 {
-                        ds.mp.is_playing = !ds.mp.is_playing;
+                // Media Player Controls
+                // Seek bar: wy + wh - 62 .. wy + wh - 46
+                if my >= wy + wh.saturating_sub(62) && my <= wy + wh.saturating_sub(46) {
+                    if mx >= wx + 35 && mx <= wx + ww.saturating_sub(35) {
+                        let bar_w = ww.saturating_sub(70).max(1);
+                        let rel_x = mx.saturating_sub(wx + 35);
+                        let notes_len = match ds.mp.track_idx {
+                            0 => NOTES_AERO.len(),
+                            1 => NOTES_STARTUP.len(),
+                            _ => NOTES_RETRO.len(),
+                        };
+                        ds.mp.note_idx = ((rel_x * notes_len) / bar_w).min(notes_len.saturating_sub(1));
+                        ds.mp.note_tick = 0;
                         gfx.draw_media_player(&ds.mp, true);
                         return;
-                    } else if mx >= wx + 250 && mx <= wx + 330 {
-                        ds.mp.is_playing = false;
+                    }
+                }
+
+                // Buttons: wy + wh - 44 .. wy + wh
+                if my >= wy + wh.saturating_sub(44) && my <= wy + wh {
+                    if mx >= wx + 35 && mx <= wx + 95 {
+                        // Prev Track [ |<< ]
+                        ds.mp.prev_track();
                         gfx.draw_media_player(&ds.mp, true);
+                        term.add_line("[Media Player: Previous Track]");
+                        return;
+                    } else if mx >= wx + 100 && mx <= wx + 215 {
+                        // Play / Pause [ > / || ]
+                        ds.mp.toggle_play();
+                        gfx.draw_media_player(&ds.mp, true);
+                        term.add_line(if ds.mp.is_playing { "[Media Player: Playing]" } else { "[Media Player: Paused]" });
+                        return;
+                    } else if mx >= wx + 220 && mx <= wx + 315 {
+                        // Stop [ [] Stop ]
+                        ds.mp.stop();
+                        gfx.draw_media_player(&ds.mp, true);
+                        term.add_line("[Media Player: Stopped]");
+                        return;
+                    } else if mx >= wx + 320 && mx <= wx + 395 {
+                        // Next Track [ >>| ]
+                        ds.mp.next_track();
+                        gfx.draw_media_player(&ds.mp, true);
+                        term.add_line("[Media Player: Next Track]");
+                        return;
+                    } else if mx >= wx + 400 && mx <= wx + 510 {
+                        // Mute / Vol [ Vol / Mute ]
+                        ds.mp.toggle_mute();
+                        gfx.draw_media_player(&ds.mp, true);
+                        term.add_line(if ds.mp.is_muted { "[Media Player: Muted]" } else { "[Media Player: Unmuted]" });
+                        return;
+                    }
+                }
+            } else if w_idx == 4 {
+                // Photos Toolbar: wy + 32 .. wy + 58
+                if my >= wy + 32 && my <= wy + 58 {
+                    if mx >= wx + 14 && mx <= wx + 160 {
+                        // Zoom: Actual Size (100% / 150% / 200%)
+                        ds.iv.cycle_zoom();
+                        gfx.draw_image_viewer(&ds.iv, true);
+                        term.add_line("[Photos: Zoom Changed]");
+                        return;
+                    } else if mx >= wx + 170 && mx <= wx + 320 {
+                        // Rotate (90° CW)
+                        ds.iv.rotate();
+                        gfx.draw_image_viewer(&ds.iv, true);
+                        term.add_line("[Photos: Image Rotated 90°]");
+                        return;
+                    } else if mx >= wx + 330 && mx <= wx + 480 {
+                        // Properties dialog
+                        ds.iv.toggle_properties();
+                        gfx.render_windows(ds, term);
+                        return;
+                    }
+                }
+            } else if w_idx == 2 {
+                // Notepad Menu Bar: wy + 32 .. wy + 56
+                if my >= wy + 32 && my <= wy + 56 {
+                    if mx >= wx + 10 && mx <= wx + 50 {
+                        // File Menu
+                        ds.np.menu_open = if ds.np.menu_open == Some(0) { None } else { Some(0) };
+                        gfx.draw_notepad(&ds.np, true);
+                        return;
+                    } else if mx >= wx + 55 && mx <= wx + 95 {
+                        // Edit Menu
+                        ds.np.menu_open = if ds.np.menu_open == Some(1) { None } else { Some(1) };
+                        gfx.draw_notepad(&ds.np, true);
+                        return;
+                    } else if mx >= wx + 100 && mx <= wx + 145 {
+                        term.add_line("[Notepad: Format -> Word Wrap enabled]");
+                        return;
+                    } else if mx >= wx + 150 && mx <= wx + 185 {
+                        term.add_line("[Notepad: View -> Status Bar enabled]");
+                        return;
+                    } else if mx >= wx + 190 && mx <= wx + 240 {
+                        // Help -> About Notepad
+                        ds.np.show_about = !ds.np.show_about;
+                        gfx.render_windows(ds, term);
                         return;
                     }
                 }
             } else if w_idx == 1 {
                 // File Explorer Client Area
-                // Ribbon Buttons: [+ New folder] [Properties]
+                // 1. Ribbon Buttons: wy + 32 .. wy + 64
                 if my >= wy + 32 && my <= wy + 64 {
-                    if mx >= wx + 215 && mx <= wx + 325 {
+                    if mx >= wx + 10 && mx <= wx + 44 {
+                        // File tab -> This PC
+                        ds.fe.view_mode = 0;
+                        ds.fe.set_path("This PC");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 46 && mx <= wx + 88 {
+                        // Home tab -> C:\Users\Vlad
+                        ds.fe.view_mode = 1;
+                        ds.fe.set_path("C:\\Users\\Vlad");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 90 && mx <= wx + 138 {
+                        // Share tab -> U:\
+                        ds.fe.view_mode = 1;
+                        ds.fe.set_path("U:\\");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 140 && mx <= wx + 185 {
+                        // View tab -> toggle view mode
+                        ds.fe.toggle_view();
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 215 && mx <= wx + 325 {
+                        // [+ New folder]
                         let cur = ds.fe.path_str();
                         let mut nf_buf = [0u8; 128];
                         let nf_len = join_path(cur, "NewFolder", &mut nf_buf);
@@ -3400,37 +4711,45 @@ fn handle_mouse_click(
                         }
                         gfx.draw_file_explorer(&ds.fe, true);
                         return;
-                    } else if mx >= wx + 415 && mx <= wx + 515 {
-                        let cur = ds.fe.path_str();
-                        term.add_line("--- Volume / Path Properties ---");
-                        if cur.starts_with("C:") || cur.starts_with('/') {
-                            term.add_line("Location: C: (VladFS Primary System Volume)");
-                            term.add_line("Capacity: 32.0 MB | Format: VladFS v1.0");
-                        } else if cur.starts_with("D:") {
-                            term.add_line("Location: D: (Secondary Data Volume)");
-                            term.add_line("Capacity: 2.00 GB | Format: FAT32");
-                        } else if cur.starts_with("E:") {
-                            term.add_line("Location: E: (VladOS Installation Media)");
-                            term.add_line("Capacity: 97.0 MB | Format: ISO9660");
-                        } else {
-                            term.add_line("Location: U: (USB Flash Storage)");
-                            term.add_line("Capacity: 32.0 GB | Format: FAT32 Removable");
-                        }
-                        if ds.cmd_open {
-                            term.render(gfx, ds);
-                        }
+                    } else if mx >= wx + 330 && mx <= wx + 400 {
+                        // [Delete] selected
+                        ds.fe.delete_selected();
+                        term.add_line("[Ribbon: Delete selected file]");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 405 && mx <= wx + 510 {
+                        // [Properties]
+                        ds.fe.properties_open = !ds.fe.properties_open;
+                        gfx.render_windows(ds, term);
                         return;
                     }
                 }
 
-                // Back Arrow [<-] or Up [^]
-                if mx >= wx + 8 && mx <= wx + 60 && my >= wy + 68 && my <= wy + 94 {
-                    ds.fe.go_up();
-                    gfx.draw_file_explorer(&ds.fe, true);
-                    return;
+                // 2. Navigation Bar: wy + 68 .. wy + 94
+                if my >= wy + 68 && my <= wy + 94 {
+                    if mx >= wx + 8 && mx <= wx + 28 {
+                        // Back [<-]
+                        ds.fe.go_back();
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 30 && mx <= wx + 50 {
+                        // Forward [->]
+                        ds.fe.go_forward();
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 52 && mx <= wx + 72 {
+                        // Up [^]
+                        ds.fe.go_up();
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    } else if mx >= wx + 76 && mx <= wx + ww.saturating_sub(180) {
+                        // Breadcrumb bar click -> refresh directory
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    }
                 }
 
-                // Left Sidebar Navigation
+                // 3. Left Sidebar Navigation: x: wx .. wx + 175
                 let sidebar_top = wy + 98;
                 if mx <= wx + 175 {
                     if my >= sidebar_top + 22 && my <= sidebar_top + 38 {
@@ -3483,7 +4802,7 @@ fn handle_mouse_click(
                     }
                 }
 
-                // Main Pane Drives (when in This PC mode)
+                // 4. Main Pane (This PC view mode == 0)
                 if ds.fe.view_mode == 0 {
                     let main_x = wx + 175;
                     // Drive C Card
@@ -3539,12 +4858,13 @@ fn handle_mouse_click(
                         }
                     }
                 } else {
-                    // Dynamic Directory Entries Click Handling
+                    // 5. Dynamic Directory Entries Click Handling
                     let main_x = wx + 175;
                     if mx >= main_x && my >= sidebar_top + 28 {
                         let row_idx = (my - (sidebar_top + 28)) / 20;
                         let count = unsafe { CURRENT_EXP_COUNT };
                         if row_idx < count {
+                            ds.fe.selected_idx = Some(row_idx);
                             let ent = unsafe { CURRENT_EXP_ENTRIES[row_idx] };
                             let name = ent.name_str();
                             let cur = ds.fe.path_str();
@@ -3556,41 +4876,9 @@ fn handle_mouse_click(
                                     gfx.draw_file_explorer(&ds.fe, true);
                                     return;
                                 } else {
-                                    if name.ends_with(".bmp") || name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg") {
-                                        ds.iv.open_image(fs);
-                                        ds.bring_to_front(4);
-                                        gfx.render_windows(ds, term);
-                                        term.add_line("[Photos opened image]");
-                                        return;
-                                    } else if name.ends_with(".mp3") || name.ends_with(".wav") || name.ends_with(".mp4") || name.ends_with(".avi") {
-                                        ds.mp.open_media(fs);
-                                        ds.bring_to_front(5);
-                                        gfx.render_windows(ds, term);
-                                        term.add_line("[Media Player playing media]");
-                                        return;
-                                    } else if name.eq_ignore_ascii_case("calc.vex") {
-                                        ds.calc.open = true;
-                                        ds.bring_to_front(3);
-                                        gfx.render_windows(ds, term);
-                                        return;
-                                    } else if name.eq_ignore_ascii_case("notepad.vex") {
-                                        ds.np.open = true;
-                                        ds.bring_to_front(2);
-                                        gfx.render_windows(ds, term);
-                                        return;
-                                    } else if name.eq_ignore_ascii_case("cmd.vex") {
-                                        ds.cmd_open = true;
-                                        ds.bring_to_front(0);
-                                        gfx.render_windows(ds, term);
-                                        return;
-                                    } else {
-                                        // Default Text / INI / CFG / SYS in Notepad
-                                        ds.np.open_file(fs);
-                                        ds.bring_to_front(2);
-                                        gfx.render_windows(ds, term);
-                                        term.add_line("[Notepad opened document]");
-                                        return;
-                                    }
+                                    launch_vex(fs, ds, term);
+                                    gfx.render_windows(ds, term);
+                                    return;
                                 }
                             }
                         }
@@ -3605,9 +4893,9 @@ fn handle_mouse_click(
 
     // 5. Desktop Area Clicks (Wallpaper & Desktop Icons)
     if my < tb_y {
-        // Check Desktop Icons (x: 20..90)
-        if mx >= 20 && mx <= 90 {
-            if my >= 20 && my <= 96 {
+        // Column 0: x: 10..90
+        if mx >= 10 && mx <= 90 {
+            if my >= 16 && my <= 76 {
                 // This PC icon
                 ds.fe.open = true;
                 ds.fe.view_mode = 0;
@@ -3616,7 +4904,7 @@ fn handle_mouse_click(
                 gfx.render_windows(ds, term);
                 term.add_line("[Desktop: This PC opened]");
                 return;
-            } else if my >= 110 && my <= 186 {
+            } else if my >= 88 && my <= 148 {
                 // Recycle Bin
                 ds.fe.open = true;
                 ds.fe.view_mode = 1;
@@ -3625,31 +4913,49 @@ fn handle_mouse_click(
                 gfx.render_windows(ds, term);
                 term.add_line("[Desktop: Recycle Bin opened]");
                 return;
-            } else if my >= 200 && my <= 276 {
-                // Control Panel -> Sysinfo
-                ds.cmd_open = true;
-                ds.bring_to_front(0);
-                term.add_line("C:\\VladOS\\System32> control panel");
-                term.add_line("VladOS 10 Control Panel - System & Security");
-                term.add_line("Hardware: 64-bit AMD64/Intel x86_64, UEFI 2.7, ACPI 2.0");
+            } else if my >= 160 && my <= 220 {
+                // Command Prompt shortcut (.lnk)
+                launch_vex("cmd.vex", ds, term);
                 gfx.render_windows(ds, term);
                 return;
-            } else if my >= 290 && my <= 366 {
-                // Network
-                ds.fe.open = true;
-                ds.fe.view_mode = 1;
-                ds.fe.set_path("U:\\");
-                ds.bring_to_front(1);
+            } else if my >= 232 && my <= 292 {
+                // File Explorer shortcut (.lnk)
+                launch_vex("explorer.vex", ds, term);
                 gfx.render_windows(ds, term);
-                term.add_line("[Desktop: Network / Shared Volumes opened]");
                 return;
-            } else if my >= 380 && my <= 456 {
+            } else if my >= 304 && my <= 364 {
+                // Notepad shortcut (.lnk)
+                launch_vex("notepad.vex", ds, term);
+                gfx.render_windows(ds, term);
+                return;
+            }
+        }
+        // Column 1: x: 100..180
+        if mx >= 100 && mx <= 180 {
+            if my >= 16 && my <= 76 {
+                // Calculator shortcut (.lnk)
+                launch_vex("calc.vex", ds, term);
+                gfx.render_windows(ds, term);
+                return;
+            } else if my >= 88 && my <= 148 {
+                // Media Player shortcut (.lnk)
+                launch_vex("player.vex", ds, term);
+                gfx.render_windows(ds, term);
+                return;
+            } else if my >= 160 && my <= 220 {
+                // Photos shortcut (.lnk)
+                launch_vex("photos.vex", ds, term);
+                gfx.render_windows(ds, term);
+                return;
+            } else if my >= 232 && my <= 292 {
+                // Control Panel shortcut (.lnk)
+                launch_vex("control panel.lnk", ds, term);
+                gfx.render_windows(ds, term);
+                return;
+            } else if my >= 304 && my <= 364 {
                 // Welcome.txt
-                ds.np.open = true;
-                ds.np.open_file("C:\\VladOS\\Welcome.txt");
-                ds.bring_to_front(2);
+                launch_vex("C:\\VladOS\\Welcome.txt", ds, term);
                 gfx.render_windows(ds, term);
-                term.add_line("[Desktop: Welcome.txt opened in Notepad]");
                 return;
             }
         }
@@ -4103,10 +5409,12 @@ pub extern "C" fn _start() -> ! {
             }
         }
 
-        // 5. Media Player Animated Visualizer Update (when active & playing)
+        // 5. Real-time Audio Playback & Animated Visualizer
         loop_ticks = loop_ticks.wrapping_add(1);
+        if loop_ticks % 10 == 0 {
+            ds.mp.tick_audio();
+        }
         if ds.mp.open && ds.mp.is_playing && (loop_ticks % 25 == 0) {
-            ds.mp.anim_tick = ds.mp.anim_tick.wrapping_add(1);
             cursor.hide(&gfx);
             gfx.draw_media_player(&ds.mp, ds.focus == 5);
             cursor.show(&gfx);
