@@ -28,7 +28,7 @@ if [ ! -f "$MKFS_VLADFS" ]; then
     cargo build --manifest-path "$REPO_DIR/components/vladfs/Cargo.toml" --release
 fi
 
-echo "1. Building VladOS Binaries (cmd.vex, explorer.vex, and vladinit.vex)..."
+echo "1. Building VladOS Binaries (cmd, explorer, vladinit, notepad, and calc)..."
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/cmd/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/cmd/Cargo.toml" --target x86_64-unknown-none --release
 CMD_BIN="$REPO_DIR/components/cmd/target/x86_64-unknown-none/release/cmd_bin"
@@ -41,6 +41,14 @@ RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/vladini
     cargo build --manifest-path "$REPO_DIR/components/vladinit/Cargo.toml" --target x86_64-unknown-none --release
 VLADINIT_BIN="$REPO_DIR/components/vladinit/target/x86_64-unknown-none/release/vladinit_bin"
 
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/notepad/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/notepad/Cargo.toml" --target x86_64-unknown-none --release
+NOTEPAD_BIN="$REPO_DIR/components/notepad/target/x86_64-unknown-none/release/notepad_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/calc/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/calc/Cargo.toml" --target x86_64-unknown-none --release
+CALC_BIN="$REPO_DIR/components/calc/target/x86_64-unknown-none/release/calc_bin"
+
 echo "2. Preparing VladOS system root ($SYSROOT_DIR)..."
 mkdir -p "$SYSROOT_DIR/VladOS/System32/config"
 mkdir -p "$SYSROOT_DIR/VladOS/System32/drivers"
@@ -48,16 +56,48 @@ cp -r "$REPO_DIR/resources/drivers/"* "$SYSROOT_DIR/VladOS/System32/drivers/"
 mkdir -p "$SYSROOT_DIR/VladOS/Resources"
 cp -r "$REPO_DIR/resources/"* "$SYSROOT_DIR/VladOS/Resources/"
 mkdir -p "$SYSROOT_DIR/Users/Default"
-mkdir -p "$SYSROOT_DIR/Users/Vlad"
+mkdir -p "$SYSROOT_DIR/Users/Vlad/Desktop"
+mkdir -p "$SYSROOT_DIR/Users/Vlad/Documents"
+mkdir -p "$SYSROOT_DIR/Users/Vlad/Downloads"
+mkdir -p "$SYSROOT_DIR/Users/Vlad/Pictures"
+mkdir -p "$SYSROOT_DIR/Users/Vlad/Music"
+mkdir -p "$SYSROOT_DIR/Users/Vlad/Videos"
 mkdir -p "$SYSROOT_DIR/Programs"
 
-# Install vladinit.vex, explorer.vex, and cmd.vex into /VladOS/System32/
+# Install binaries into /VladOS/System32/
 cp "$VLADINIT_BIN" "$SYSROOT_DIR/VladOS/System32/vladinit.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/vladinit.vex"
 cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/explorer.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/explorer.vex"
 cp "$CMD_BIN" "$SYSROOT_DIR/VladOS/System32/cmd.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/cmd.vex"
+cp "$NOTEPAD_BIN" "$SYSROOT_DIR/VladOS/System32/notepad.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/notepad.vex"
+cp "$CALC_BIN" "$SYSROOT_DIR/VladOS/System32/calc.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/calc.vex"
+
+# Install standard media files
+cp "$REPO_DIR/resources/media/wallpaper.bmp" "$SYSROOT_DIR/Users/Vlad/Pictures/"
+cp "$REPO_DIR/resources/media/logo.png" "$SYSROOT_DIR/Users/Vlad/Pictures/"
+cp "$REPO_DIR/resources/media/photo.jpg" "$SYSROOT_DIR/Users/Vlad/Pictures/"
+cp "$REPO_DIR/resources/media/ambient.mp3" "$SYSROOT_DIR/Users/Vlad/Music/"
+cp "$REPO_DIR/resources/media/startup.wav" "$SYSROOT_DIR/Users/Vlad/Music/"
+cp "$REPO_DIR/resources/media/sample.mp4" "$SYSROOT_DIR/Users/Vlad/Videos/"
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Desktop/Welcome.txt"
+Welcome to VladOS 10 Professional!
+- Modern Windows 10 Aero User Interface
+- Real Hardware PCI and USB Bus Auto-detection (disks & flash drives)
+- Notepad (notepad.vex), Calculator (calc.vex), Media Player, and Photos
+- Dynamic Multi-Drive Storage: VladFS (C:), FAT32 (D:), ISO9660 (E:), USB Flash (U:)
+EOF
+
+cat << 'EOF' > "$SYSROOT_DIR/Users/Vlad/Documents/Notes.txt"
+VladOS Project Notes:
+All mock objects and stubs removed.
+Real hardware storage scanning and dynamic VFS active.
+Standard image and audio playback enabled.
+EOF
 
 cat << 'EOF' > "$SYSROOT_DIR/VladOS/System32/config/system.ini"
 ; VladOS Configuration
