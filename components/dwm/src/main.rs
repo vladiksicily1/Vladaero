@@ -1247,177 +1247,6 @@ pub struct DesktopState {
     pub keyboard_lang: usize, // 0 = "RUS", 1 = "ENG"
 }
 
-#[derive(Clone, Copy)]
-pub struct UiVolume {
-    pub letter: char,
-    pub label: [u8; 24],
-    pub label_len: usize,
-    pub fs: [u8; 12],
-    pub fs_len: usize,
-    pub total_mb: usize,
-    pub free_mb: usize,
-    pub is_removable: bool,
-}
-
-impl UiVolume {
-    pub const fn empty() -> Self {
-        Self {
-            letter: 'C',
-            label: [0u8; 24],
-            label_len: 0,
-            fs: [0u8; 12],
-            fs_len: 0,
-            total_mb: 0,
-            free_mb: 0,
-            is_removable: false,
-        }
-    }
-
-    pub fn label_str(&self) -> &str {
-        core::str::from_utf8(&self.label[..self.label_len]).unwrap_or("")
-    }
-
-    pub fn fs_str(&self) -> &str {
-        core::str::from_utf8(&self.fs[..self.fs_len]).unwrap_or("")
-    }
-}
-
-fn write_u64_str(mut n: u64, buf: &mut [u8]) -> usize {
-    if n == 0 {
-        if !buf.is_empty() {
-            buf[0] = b'0';
-            return 1;
-        }
-        return 0;
-    }
-    let mut tmp = [0u8; 20];
-    let mut i = 0;
-    while n > 0 && i < 20 {
-        tmp[i] = b'0' + (n % 10) as u8;
-        n /= 10;
-        i += 1;
-    }
-    let to_copy = i.min(buf.len());
-    for j in 0..to_copy {
-        buf[j] = tmp[i - 1 - j];
-    }
-    to_copy
-}
-
-fn format_mb_capacity<'a>(free_mb: usize, total_mb: usize, buf: &'a mut [u8; 48]) -> &'a str {
-    let mut idx = 0;
-    if total_mb >= 1024 {
-        let free_gb = free_mb / 1024;
-        let free_frac = (free_mb % 1024) * 10 / 1024;
-        idx += write_u64_str(free_gb as u64, &mut buf[idx..]);
-        if idx < 46 { buf[idx] = b'.'; idx += 1; }
-        if idx < 46 { buf[idx] = b'0' + (free_frac as u8); idx += 1; }
-        let s1 = b" GB free of ";
-        let c1 = s1.len().min(46usize.saturating_sub(idx));
-        buf[idx..idx + c1].copy_from_slice(&s1[..c1]); idx += c1;
-
-        let tot_gb = total_mb / 1024;
-        let tot_frac = (total_mb % 1024) * 10 / 1024;
-        idx += write_u64_str(tot_gb as u64, &mut buf[idx..]);
-        if idx < 46 { buf[idx] = b'.'; idx += 1; }
-        if idx < 46 { buf[idx] = b'0' + (tot_frac as u8); idx += 1; }
-        let s2 = b" GB";
-        let c2 = s2.len().min(48usize.saturating_sub(idx));
-        buf[idx..idx + c2].copy_from_slice(&s2[..c2]); idx += c2;
-    } else {
-        idx += write_u64_str(free_mb as u64, &mut buf[idx..]);
-        let s1 = b" MB free of ";
-        let c1 = s1.len().min(46usize.saturating_sub(idx));
-        buf[idx..idx + c1].copy_from_slice(&s1[..c1]); idx += c1;
-        idx += write_u64_str(total_mb as u64, &mut buf[idx..]);
-        let s2 = b" MB";
-        let c2 = s2.len().min(48usize.saturating_sub(idx));
-        buf[idx..idx + c2].copy_from_slice(&s2[..c2]); idx += c2;
-    }
-    core::str::from_utf8(&buf[..idx]).unwrap_or("")
-}
-
-static mut UI_VOL_FETCH_BUF: [u8; 4096] = [0u8; 4096];
-
-fn fetch_ui_volumes(out: &mut [UiVolume; 16]) -> usize {
-    #[allow(static_mut_refs)]
-    let n = unsafe { sys_drives(&mut UI_VOL_FETCH_BUF) };
-    if n == 0 || n > 4096 {
-        out[0].letter = 'C';
-        let lbl = b"VLADOS_SYS";
-        out[0].label[..lbl.len()].copy_from_slice(lbl);
-        out[0].label_len = lbl.len();
-        let fs = b"VladFS";
-        out[0].fs[..fs.len()].copy_from_slice(fs);
-        out[0].fs_len = fs.len();
-        out[0].total_mb = 32;
-        out[0].free_mb = 24;
-        return 1;
-    }
-
-    #[allow(static_mut_refs)]
-    let text = match core::str::from_utf8(unsafe { &UI_VOL_FETCH_BUF[..n] }) {
-        Ok(s) => s,
-        Err(_) => return 0,
-    };
-
-    let idx = match text.find("=== VOLUMES ===") {
-        Some(i) => i,
-        None => return 0,
-    };
-
-    let mut count = 0;
-    for line in text[idx..].lines().skip(1) {
-        let trimmed = line.trim();
-        if trimmed.is_empty() { continue; }
-        let mut parts = trimmed.split('|');
-        let _vol_id = parts.next();
-        let ltr_str = parts.next().unwrap_or(" ");
-        let label_str = parts.next().unwrap_or("");
-        let fs_str = parts.next().unwrap_or("");
-        let _layout = parts.next();
-        let total_str = parts.next().unwrap_or("0");
-        let free_str = parts.next().unwrap_or("0");
-        let _status = parts.next();
-        let role_str = parts.next().unwrap_or("");
-
-        if count < 16 {
-            let letter = ltr_str.chars().next().unwrap_or('C').to_ascii_uppercase();
-            let mut v = UiVolume::empty();
-            v.letter = letter;
-            let l_bytes = label_str.as_bytes();
-            let l_len = l_bytes.len().min(24);
-            v.label[..l_len].copy_from_slice(&l_bytes[..l_len]);
-            v.label_len = l_len;
-
-            let fs_bytes = fs_str.as_bytes();
-            let fs_len = fs_bytes.len().min(12);
-            v.fs[..fs_len].copy_from_slice(&fs_bytes[..fs_len]);
-            v.fs_len = fs_len;
-
-            v.total_mb = total_str.parse::<usize>().unwrap_or(0);
-            v.free_mb = free_str.parse::<usize>().unwrap_or(0);
-            v.is_removable = role_str.eq_ignore_ascii_case("Removable");
-
-            out[count] = v;
-            count += 1;
-        }
-    }
-    if count == 0 {
-        out[0].letter = 'C';
-        let lbl = b"VLADOS_SYS";
-        out[0].label[..lbl.len()].copy_from_slice(lbl);
-        out[0].label_len = lbl.len();
-        let fs = b"VladFS";
-        out[0].fs[..fs.len()].copy_from_slice(fs);
-        out[0].fs_len = fs.len();
-        out[0].total_mb = 32;
-        out[0].free_mb = 24;
-        return 1;
-    }
-    count
-}
-
 impl DesktopState {
     pub fn new() -> Self {
         Self {
@@ -3548,119 +3377,61 @@ impl Gfx {
         self.fill_rect(main_x, content_y, main_w, content_h, 0x101010);
 
         if fe.view_mode == 0 {
-            // "This PC" Mode: Dynamically display all mounted logical drives with progress bars!
-            let mut ui_vols: [UiVolume; 16] = [UiVolume::empty(); 16];
-            let vol_count = fetch_ui_volumes(&mut ui_vols);
-
-            let mut header_buf = [0u8; 32];
-            let header_prefix = b"Devices and drives (";
-            header_buf[..header_prefix.len()].copy_from_slice(header_prefix);
-            let mut h_idx = header_prefix.len();
-            if vol_count < 10 {
-                header_buf[h_idx] = b'0' + (vol_count as u8);
-                h_idx += 1;
-            } else {
-                header_buf[h_idx] = b'0' + ((vol_count / 10) as u8);
-                header_buf[h_idx + 1] = b'0' + ((vol_count % 10) as u8);
-                h_idx += 2;
-            }
-            header_buf[h_idx] = b')';
-            h_idx += 1;
-            let header_str = core::str::from_utf8(&header_buf[..h_idx]).unwrap_or("Devices and drives");
-
-            self.draw_text(main_x + 16, content_y + 12, header_str, 0x888888, 0x101010);
+            // "This PC" Mode: Display logical drives with visual progress bars!
+            self.draw_text(main_x + 16, content_y + 12, "Devices and drives (4)", 0x888888, 0x101010);
             self.fill_rect(main_x + 16, content_y + 30, main_w.saturating_sub(32), 1, 0x222222);
 
-            for i in 0..vol_count {
-                let v = &ui_vols[i];
-                let col = i % 2;
-                let row = i / 2;
-                let card_x = if col == 0 { main_x + 16 } else { main_x + 290 };
-                let card_y = content_y + 40 + row * 84;
+            // Drive C: Card (VladFS)
+            self.fill_rect(main_x + 16, content_y + 40, 260, 68, 0x181818);
+            self.draw_rect_outline(main_x + 16, content_y + 40, 260, 68, 0x2A2A2A);
+            self.fill_rect(main_x + 26, content_y + 50, 28, 28, 0x0078D7);
+            self.draw_text(main_x + 32, content_y + 56, "C:", 0xFFFFFF, 0x0078D7);
+            self.draw_text(main_x + 62, content_y + 46, "Local Disk (C:)", 0xFFFFFF, 0x181818);
+            self.draw_text(main_x + 62, content_y + 62, "VladFS Volume (VLADOS_SYS)", 0x888888, 0x181818);
+            self.fill_rect(main_x + 62, content_y + 80, 190, 8, 0x333333);
+            self.fill_rect(main_x + 62, content_y + 80, 142, 8, 0x0078D7); // 24MB free of 32MB
+            self.draw_text(main_x + 62, content_y + 92, "24.2 MB free of 32.0 MB", 0x777777, 0x181818);
 
-                self.fill_rect(card_x, card_y, 260, 68, 0x181818);
-                self.draw_rect_outline(card_x, card_y, 260, 68, 0x2A2A2A);
+            // Drive D: Card (FAT32/EXT2)
+            self.fill_rect(main_x + 290, content_y + 40, 260, 68, 0x181818);
+            self.draw_rect_outline(main_x + 290, content_y + 40, 260, 68, 0x2A2A2A);
+            self.fill_rect(main_x + 300, content_y + 50, 28, 28, 0x2D7D9A);
+            self.draw_text(main_x + 306, content_y + 56, "D:", 0xFFFFFF, 0x2D7D9A);
+            self.draw_text(main_x + 336, content_y + 46, "Data Drive (D:)", 0xFFFFFF, 0x181818);
+            self.draw_text(main_x + 336, content_y + 62, "FAT32 / EXT2 (DATA_DRIVE)", 0x888888, 0x181818);
+            self.fill_rect(main_x + 336, content_y + 80, 190, 8, 0x333333);
+            self.fill_rect(main_x + 336, content_y + 80, 168, 8, 0x0078D7); // 1.84GB free of 2GB
+            self.draw_text(main_x + 336, content_y + 92, "1.84 GB free of 2.00 GB", 0x777777, 0x181818);
 
-                let badge_color = if v.letter == 'C' {
-                    0x0078D7
-                } else if v.is_removable {
-                    0x9A4D8B
-                } else if v.fs_str().eq_ignore_ascii_case("ISO9660") {
-                    0x777777
-                } else {
-                    0x2D7D9A
-                };
+            // Drive E: Card (ISO9660)
+            self.fill_rect(main_x + 16, content_y + 124, 260, 68, 0x181818);
+            self.draw_rect_outline(main_x + 16, content_y + 124, 260, 68, 0x2A2A2A);
+            self.fill_rect(main_x + 26, content_y + 134, 28, 28, 0x777777);
+            self.draw_text(main_x + 32, content_y + 140, "CD", 0xFFFFFF, 0x777777);
+            self.draw_text(main_x + 62, content_y + 126, "CD Drive (E:) VLADOS", 0xFFFFFF, 0x181818);
+            self.draw_text(main_x + 62, content_y + 146, "ISO9660 Optical Media", 0x888888, 0x181818);
+            self.fill_rect(main_x + 62, content_y + 164, 190, 8, 0x333333);
+            self.fill_rect(main_x + 62, content_y + 164, 190, 8, 0x777777);
+            self.draw_text(main_x + 62, content_y + 176, "0 bytes free of 97.0 MB", 0x777777, 0x181818);
 
-                self.fill_rect(card_x + 10, card_y + 10, 28, 28, badge_color);
-                let l_badge = [v.letter as u8, b':'];
-                if let Ok(lbs) = core::str::from_utf8(&l_badge) {
-                    self.draw_text(card_x + 14, card_y + 16, lbs, 0xFFFFFF, badge_color);
-                }
-
-                // Title
-                if v.letter == 'C' {
-                    self.draw_text(card_x + 46, card_y + 6, "Local Disk (C:)", 0xFFFFFF, 0x181818);
-                } else if v.is_removable {
-                    let mut title_buf = [0u8; 32];
-                    let prefix = b"Removable (";
-                    title_buf[..prefix.len()].copy_from_slice(prefix);
-                    title_buf[prefix.len()] = v.letter as u8;
-                    title_buf[prefix.len() + 1] = b':';
-                    title_buf[prefix.len() + 2] = b')';
-                    if let Ok(ts) = core::str::from_utf8(&title_buf[..prefix.len() + 3]) {
-                        self.draw_text(card_x + 46, card_y + 6, ts, 0xFFFFFF, 0x181818);
-                    }
-                } else {
-                    let mut title_buf = [0u8; 32];
-                    let prefix = b"Volume (";
-                    title_buf[..prefix.len()].copy_from_slice(prefix);
-                    title_buf[prefix.len()] = v.letter as u8;
-                    title_buf[prefix.len() + 1] = b':';
-                    title_buf[prefix.len() + 2] = b')';
-                    if let Ok(ts) = core::str::from_utf8(&title_buf[..prefix.len() + 3]) {
-                        self.draw_text(card_x + 46, card_y + 6, ts, 0xFFFFFF, 0x181818);
-                    }
-                }
-
-                // Subtitle: FS and Label
-                let mut sub_buf = [0u8; 48];
-                let mut si = 0;
-                let fs_b = v.fs_str().as_bytes();
-                sub_buf[si..si + fs_b.len()].copy_from_slice(fs_b); si += fs_b.len();
-                let sep = b" (";
-                sub_buf[si..si + sep.len()].copy_from_slice(sep); si += sep.len();
-                let lbl_b = v.label_str().as_bytes();
-                let copy_lbl = lbl_b.len().min(sub_buf.len() - si - 2);
-                sub_buf[si..si + copy_lbl].copy_from_slice(&lbl_b[..copy_lbl]); si += copy_lbl;
-                sub_buf[si] = b')'; si += 1;
-                if let Ok(ss) = core::str::from_utf8(&sub_buf[..si]) {
-                    self.draw_text(card_x + 46, card_y + 22, ss, 0x888888, 0x181818);
-                }
-
-                // Progress bar
-                self.fill_rect(card_x + 46, card_y + 40, 190, 8, 0x333333);
-                let used_mb = v.total_mb.saturating_sub(v.free_mb);
-                let bar_w = if v.total_mb > 0 {
-                    ((used_mb as u64 * 190) / (v.total_mb as u64)) as usize
-                } else {
-                    0
-                };
-                self.fill_rect(card_x + 46, card_y + 40, bar_w.min(190), 8, badge_color);
-
-                // Capacity text
-                let mut cap_buf = [0u8; 48];
-                let cap_str = format_mb_capacity(v.free_mb, v.total_mb, &mut cap_buf);
-                self.draw_text(card_x + 46, card_y + 52, cap_str, 0x777777, 0x181818);
-            }
+            // Drive U: Card (Removable USB Flash Drive)
+            self.fill_rect(main_x + 290, content_y + 124, 260, 68, 0x181818);
+            self.draw_rect_outline(main_x + 290, content_y + 124, 260, 68, 0x2A2A2A);
+            self.fill_rect(main_x + 300, content_y + 134, 28, 28, 0x9A4D8B);
+            self.draw_text(main_x + 306, content_y + 140, "U:", 0xFFFFFF, 0x9A4D8B);
+            self.draw_text(main_x + 336, content_y + 126, "USB Drive (U:)", 0xFFFFFF, 0x181818);
+            self.draw_text(main_x + 336, content_y + 146, "FAT32 Removable Flash", 0x888888, 0x181818);
+            self.fill_rect(main_x + 336, content_y + 164, 190, 8, 0x333333);
+            self.fill_rect(main_x + 336, content_y + 164, 170, 8, 0x9A4D8B);
+            self.draw_text(main_x + 336, content_y + 176, "28.6 GB free of 32.0 GB", 0x777777, 0x181818);
 
             // Folders Section
-            let folders_y = content_y + 40 + ((vol_count + 1) / 2) * 84 + 10;
-            self.draw_text(main_x + 16, folders_y, "Folders (4)", 0x888888, 0x101010);
-            self.fill_rect(main_x + 16, folders_y + 18, main_w.saturating_sub(32), 1, 0x222222);
-            self.draw_text(main_x + 24, folders_y + 28, "Desktop", 0xCCCCCC, 0x101010);
-            self.draw_text(main_x + 150, folders_y + 28, "Documents", 0xCCCCCC, 0x101010);
-            self.draw_text(main_x + 290, folders_y + 28, "Downloads", 0xCCCCCC, 0x101010);
-            self.draw_text(main_x + 430, folders_y + 28, "Pictures", 0xCCCCCC, 0x101010);
+            self.draw_text(main_x + 16, content_y + 206, "Folders (4)", 0x888888, 0x101010);
+            self.fill_rect(main_x + 16, content_y + 224, main_w.saturating_sub(32), 1, 0x222222);
+            self.draw_text(main_x + 24, content_y + 236, "Desktop", 0xCCCCCC, 0x101010);
+            self.draw_text(main_x + 150, content_y + 236, "Documents", 0xCCCCCC, 0x101010);
+            self.draw_text(main_x + 290, content_y + 236, "Downloads", 0xCCCCCC, 0x101010);
+            self.draw_text(main_x + 430, content_y + 236, "Pictures", 0xCCCCCC, 0x101010);
         } else {
             // Folder Contents View (C:, D:, or E:)
             self.fill_rect(main_x, content_y, main_w, 22, 0x181818);
@@ -5364,34 +5135,36 @@ fn handle_mouse_click(
                 // 4. Main Pane (This PC view mode == 0)
                 if ds.fe.view_mode == 0 {
                     let main_x = wx + 175;
-                    let mut ui_vols: [UiVolume; 16] = [UiVolume::empty(); 16];
-                    let vol_count = fetch_ui_volumes(&mut ui_vols);
-
-                    for i in 0..vol_count {
-                        let v = &ui_vols[i];
-                        let col = i % 2;
-                        let row = i / 2;
-                        let card_x = if col == 0 { main_x + 16 } else { main_x + 290 };
-                        let card_y = sidebar_top + 40 + row * 84;
-
-                        if mx >= card_x && mx <= card_x + 260 && my >= card_y && my <= card_y + 68 {
-                            ds.fe.view_mode = 1;
-                            if v.letter == 'C' {
-                                ds.fe.set_path("C:\\VladOS");
-                            } else {
-                                let p_buf = [v.letter as u8, b':', b'\\'];
-                                if let Ok(ps) = core::str::from_utf8(&p_buf) {
-                                    ds.fe.set_path(ps);
-                                }
-                            }
-                            gfx.draw_file_explorer(&ds.fe, true);
-                            return;
-                        }
+                    // Drive C Card
+                    if mx >= main_x + 16 && mx <= main_x + 276 && my >= sidebar_top + 40 && my <= sidebar_top + 108 {
+                        ds.fe.view_mode = 1;
+                        ds.fe.set_path("C:\\VladOS");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
                     }
-
+                    // Drive D Card
+                    if mx >= main_x + 290 && mx <= main_x + 550 && my >= sidebar_top + 40 && my <= sidebar_top + 108 {
+                        ds.fe.view_mode = 1;
+                        ds.fe.set_path("D:\\");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    }
+                    // Drive E Card
+                    if mx >= main_x + 16 && mx <= main_x + 276 && my >= sidebar_top + 124 && my <= sidebar_top + 192 {
+                        ds.fe.view_mode = 1;
+                        ds.fe.set_path("E:\\");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    }
+                    // Drive U Card (USB Flash Drive)
+                    if mx >= main_x + 290 && mx <= main_x + 550 && my >= sidebar_top + 124 && my <= sidebar_top + 192 {
+                        ds.fe.view_mode = 1;
+                        ds.fe.set_path("U:\\");
+                        gfx.draw_file_explorer(&ds.fe, true);
+                        return;
+                    }
                     // Folders: Desktop, Documents, Downloads, Pictures
-                    let folders_y = sidebar_top + 40 + ((vol_count + 1) / 2) * 84 + 10;
-                    if my >= folders_y + 20 && my <= folders_y + 46 {
+                    if my >= sidebar_top + 230 && my <= sidebar_top + 256 {
                         if mx >= main_x + 20 && mx <= main_x + 120 {
                             ds.fe.view_mode = 1;
                             ds.fe.set_path("C:\\Users\\Vlad\\Desktop");

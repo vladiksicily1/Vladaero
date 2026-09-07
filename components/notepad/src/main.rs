@@ -105,8 +105,7 @@ static mut TEXT_LEN: usize = 0;
 static mut FILE_NAME: [u8; 128] = [0u8; 128];
 static mut FILE_NAME_LEN: usize = 0;
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+pub fn run_notepad(file_arg: &str) {
     print("\x1b[2J\x1b[H"); // Clear screen
     println("================================================================================");
     println("                      VladOS 10 Professional - Notepad                          ");
@@ -114,14 +113,19 @@ pub extern "C" fn _start() -> ! {
     println(" Commands: :w (Save) | :q (Quit) | :n <filename> (New/Open) | :show (Display)");
     println("--------------------------------------------------------------------------------");
 
-    // Set default file name
-    let default_name = b"C:\\Users\\Vlad\\Documents\\Note.txt";
+    let target = if file_arg.trim().is_empty() {
+        "C:\\Users\\Vlad\\Documents\\Notes.txt"
+    } else {
+        file_arg.trim()
+    };
+
     unsafe {
-        FILE_NAME[..default_name.len()].copy_from_slice(default_name);
-        FILE_NAME_LEN = default_name.len();
+        let b = target.as_bytes();
+        let l = b.len().min(128);
+        FILE_NAME[..l].copy_from_slice(&b[..l]);
+        FILE_NAME_LEN = l;
     }
 
-    // Try loading existing file
     let path = unsafe { core::str::from_utf8_unchecked(&FILE_NAME[..FILE_NAME_LEN]) };
     let n = unsafe { sys_vfs_read(path, &mut TEXT_BUFFER) };
     if n > 0 && n <= 16384 {
@@ -138,14 +142,7 @@ pub extern "C" fn _start() -> ! {
         println(path);
     }
 
-    println("Current Content:");
-    println("----------------");
-    let current_text = unsafe { core::str::from_utf8_unchecked(&TEXT_BUFFER[..TEXT_LEN]) };
-    print(current_text);
-    if !current_text.ends_with('\n') {
-        print("\r\n");
-    }
-    println("----------------");
+    println("Enter text to append, or use commands (:w, :q, :show).");
 
     let mut line_buf = [0u8; 256];
     let mut line_len = 0;
@@ -154,6 +151,7 @@ pub extern "C" fn _start() -> ! {
         print("notepad> ");
         line_len = 0;
         let mut char_buf = [0u8; 1];
+
         loop {
             let n = unsafe { sys_read(0, &mut char_buf) };
             if n == 0 || n == usize::MAX {
@@ -179,23 +177,43 @@ pub extern "C" fn _start() -> ! {
             }
         }
 
-        let cmd = core::str::from_utf8(&line_buf[..line_len]).unwrap_or("").trim();
-        if cmd == ":q" || cmd == ":quit" || cmd == "exit" {
-            println("Exiting Notepad...");
+        let cmd = match core::str::from_utf8(&line_buf[..line_len]) {
+            Ok(s) => s.trim(),
+            Err(_) => continue,
+        };
+
+        if cmd == ":q" || cmd == ":quit" {
+            println("Exiting VladOS Notepad...");
             break;
         } else if cmd == ":w" || cmd == ":save" {
             let p = unsafe { core::str::from_utf8_unchecked(&FILE_NAME[..FILE_NAME_LEN]) };
-            let ret = unsafe { sys_vfs_write(p, &TEXT_BUFFER[..TEXT_LEN]) };
-            if ret > 0 {
+            let len = unsafe { TEXT_LEN };
+            let data = unsafe { &TEXT_BUFFER[..len] };
+            let written = unsafe { sys_vfs_write(p, data) };
+            if written > 0 {
                 print("Successfully saved ");
                 print(p);
-                println(" !");
+                print(" (bytes: ");
+                let mut num_buf = [0u8; 10];
+                let mut n = written;
+                let mut i = 0;
+                while n > 0 {
+                    num_buf[i] = b'0' + (n % 10) as u8;
+                    n /= 10;
+                    i += 1;
+                }
+                for j in (0..i).rev() {
+                    let b = [num_buf[j]];
+                    print(core::str::from_utf8(&b).unwrap_or(""));
+                }
+                println(")");
             } else {
-                println("Error: Failed to save file (Access Denied or Volume Read-Only).");
+                println("Error: Failed to save file (Read-only volume or permission denied).");
             }
-        } else if cmd == ":show" {
-            println("--- File Buffer ---");
-            let t = unsafe { core::str::from_utf8_unchecked(&TEXT_BUFFER[..TEXT_LEN]) };
+        } else if cmd == ":show" || cmd == ":p" {
+            println("--- File Contents ---");
+            let len = unsafe { TEXT_LEN };
+            let t = unsafe { core::str::from_utf8_unchecked(&TEXT_BUFFER[..len]) };
             print(t);
             if !t.ends_with('\n') {
                 print("\r\n");
@@ -237,10 +255,19 @@ pub extern "C" fn _start() -> ! {
             }
         }
     }
+}
 
-    loop {
-        unsafe { sys_yield() };
-    }
+#[no_mangle]
+pub extern "C" fn _start(arg_ptr: *const u8, arg_len: usize) -> usize {
+    let args = if arg_ptr.is_null() || arg_len == 0 {
+        ""
+    } else {
+        unsafe {
+            core::str::from_utf8(core::slice::from_raw_parts(arg_ptr, arg_len)).unwrap_or("")
+        }
+    };
+    run_notepad(args);
+    0
 }
 
 #[panic_handler]

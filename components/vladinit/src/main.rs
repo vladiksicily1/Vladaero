@@ -7,7 +7,6 @@ const SYS_CLASS_FILE: usize = 0x2000_0000;
 const SYS_ARG_SLICE: usize = 0x0100_0000;
 const SYS_WRITE: usize = SYS_CLASS_FILE | SYS_ARG_SLICE | 4;
 const SYS_YIELD: usize = 158;
-
 const SYS_NANOSLEEP: usize = 162;
 
 #[repr(C)]
@@ -69,17 +68,14 @@ fn println(s: &str) {
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    // vladinit.vex (PID 1) holds master control over system startup
-    // 1. Maintain bootscreen while initializing core system services
     let sleep_req = TimeSpec {
         tv_sec: 0,
-        tv_nsec: 400_000_000, // 0.4s fast bootscreen display
+        tv_nsec: 300_000_000,
     };
     unsafe {
         sys_nanosleep(&sleep_req);
     }
 
-    // 2. Transition from quiet bootscreen to interactive console
     print("\x1b[2J\x1b[H");
 
     println("=================================================");
@@ -90,11 +86,11 @@ pub extern "C" fn _start() -> ! {
     println("[vladinit] Full control transferred from kernel to vladinit.vex.");
     println("[vladinit] Loading system configuration (/VladOS/System32/config/system.ini)...");
     println("[vladinit] Storage subsystem active: VladFS mounted on C:\\");
-    println("[vladinit] Launching desktop shell: /VladOS/System32/explorer.vex...");
+    println("[vladinit] Initializing Desktop Window Manager: /VladOS/System32/dwm.vex...");
+    println("[vladinit] Launching VladOS Desktop Shell: /VladOS/System32/explorer.vex...");
     println("-------------------------------------------------");
     println("");
 
-    // 3. Load and jump to explorer.vex ELF
     load_and_run_explorer();
 }
 

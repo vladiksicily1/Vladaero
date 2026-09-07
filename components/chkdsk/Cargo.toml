@@ -1,0 +1,17 @@
+[package]
+name = "chkdsk"
+version = "1.0.0"
+edition = "2021"
+description = "VladOS 10 Check Disk File System Integrity Utility (.vex binary)"
+
+[[bin]]
+name = "chkdsk_bin"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = true
+codegen-units = 1

@@ -1,0 +1,17 @@
+[package]
+name = "shutdown"
+version = "1.0.0"
+edition = "2021"
+description = "VladOS 10 Shutdown and Restart Utility (.vex binary)"
+
+[[bin]]
+name = "shutdown_bin"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = true
+codegen-units = 1

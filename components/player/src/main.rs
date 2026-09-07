@@ -11,8 +11,7 @@ const SYS_WRITE: usize = SYS_CLASS_FILE | SYS_ARG_SLICE | 4;
 const SYS_READ: usize = SYS_CLASS_FILE | SYS_ARG_MSLICE | 3;
 const SYS_YIELD: usize = 158;
 const SYS_NANOSLEEP: usize = 162;
-
-const SYS_VLADOS_BEEP: usize = 0x5650;
+const SYS_VLADOS_BEEP: usize = 0x5655;
 const SYS_VLADOS_VFS_READ: usize = 0x5646;
 
 #[repr(C)]
@@ -100,9 +99,9 @@ unsafe fn sys_vfs_read(path: &str, buf: &mut [u8]) -> usize {
     core::arch::asm!(
         "syscall",
         inlateout("rax") SYS_VLADOS_VFS_READ => ret,
-        in("rdi") path.as_ptr(),
+        in("rdi") path.as_ptr() as usize,
         in("rsi") path.len(),
-        in("rdx") buf.as_mut_ptr(),
+        in("rdx") buf.as_mut_ptr() as usize,
         in("r10") buf.len(),
         out("rcx") _,
         out("r11") _,
@@ -141,13 +140,13 @@ static PLAYLIST: [Track; 4] = [
         duration: "00:08",
     },
     Track {
-        title: "Windows 10 Aero Theme Synth",
+        title: "VladOS Aero Theme Synth",
         artist: "PC Speaker 8254 PIT",
         path: "C:\\VladOS\\Resources\\theme.wav",
         duration: "02:10",
     },
     Track {
-        title: "System Hardware Test Bell",
+        title: "System Hardware Bell",
         artist: "Realtek High Definition",
         path: "C:\\VladOS\\Resources\\bell.wav",
         duration: "00:04",
@@ -173,28 +172,66 @@ static NOTES_CHIME: [(u32, u64); 5] = [
     (1108, 350), // C#6
 ];
 
+pub fn play_audio_file(file_path: &str) {
+    let mut header = [0u8; 64];
+    let n = unsafe { sys_vfs_read(file_path, &mut header) };
+    print("Loading track: ");
+    println(file_path);
+    if n > 0 {
+        print("Audio file size verified (");
+        print_num(n);
+        println(" header bytes read)");
+    } else {
+        println("Note: Synthesizing track via VladOS PIT Audio Subsystem");
+    }
+
+    if file_path.contains("startup") || file_path.contains("chime") {
+        for &(freq, dur) in &NOTES_CHIME {
+            unsafe {
+                sys_beep(freq, dur as u32);
+                sys_sleep_ms(dur);
+            }
+        }
+    } else {
+        for &(freq, dur) in &NOTES_AMBIENT {
+            unsafe {
+                sys_beep(freq, dur as u32);
+                sys_sleep_ms(dur);
+            }
+        }
+    }
+    unsafe {
+        sys_beep(0, 0);
+    }
+    println("Playback finished.");
+}
+
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
+pub extern "C" fn _start(arg_ptr: *const u8, arg_len: usize) -> usize {
+    let args = if arg_ptr.is_null() || arg_len == 0 {
+        ""
+    } else {
+        unsafe {
+            core::str::from_utf8(core::slice::from_raw_parts(arg_ptr, arg_len)).unwrap_or("")
+        }
+    };
+    if !args.trim().is_empty() {
+        play_audio_file(args.trim());
+        return 0;
+    }
+
     print("\x1b[2J\x1b[H");
     println("================================================================================");
-    println("              VladOS 10 Professional - Windows Media Player                     ");
+    println("              VladOS 10 Professional - Media Player                             ");
     println("                      Binary: /VladOS/System32/player.vex                       ");
     println("================================================================================");
     println(" Audio Engine: Realtek High Definition Audio / PC Speaker 8254 PIT Subsystem");
     println(" Commands: PLAY, PAUSE, STOP, NEXT, PREV, LIST, VOL <0-100>, INFO, EXIT");
-    println(" Tab Autocomplete supported! Press TAB to complete commands.");
     println("--------------------------------------------------------------------------------");
 
     let mut current_track: usize = 0;
     let mut is_playing = false;
-    let mut volume: u32 = 80;
-
     let mut line_buf = [0u8; 128];
-
-    // Command autocomplete list
-    let commands = [
-        "play", "pause", "stop", "next", "prev", "list", "vol", "info", "help", "exit",
-    ];
 
     loop {
         print("player> ");
@@ -213,28 +250,9 @@ pub extern "C" fn _start() -> ! {
                 print("\r\n");
                 break;
             } else if b == 8 || b == 127 {
-                // Backspace
                 if line_len > 0 {
                     line_len -= 1;
                     print("\x08 \x08");
-                }
-            } else if b == b'\t' {
-                // TAB Autocomplete
-                let current_input = core::str::from_utf8(&line_buf[..line_len]).unwrap_or("");
-                if !current_input.is_empty() {
-                    for cmd in &commands {
-                        if cmd.starts_with(current_input) && cmd.len() > current_input.len() {
-                            let remainder = &cmd[current_input.len()..];
-                            for rb in remainder.bytes() {
-                                if line_len < line_buf.len() {
-                                    line_buf[line_len] = rb;
-                                    line_len += 1;
-                                }
-                            }
-                            print(remainder);
-                            break;
-                        }
-                    }
                 }
             } else if b >= 32 && b <= 126 {
                 if line_len < line_buf.len() {
@@ -246,130 +264,67 @@ pub extern "C" fn _start() -> ! {
             }
         }
 
-        let line = core::str::from_utf8(&line_buf[..line_len]).unwrap_or("").trim();
-        if line.is_empty() {
+        let cmd = match core::str::from_utf8(&line_buf[..line_len]) {
+            Ok(s) => s.trim(),
+            Err(_) => continue,
+        };
+
+        if cmd.is_empty() {
             continue;
         }
 
-        let mut parts = line.split_ascii_whitespace();
-        let cmd = parts.next().unwrap_or("");
-
-        if eq_ignore_ascii_case(cmd, "exit") || eq_ignore_ascii_case(cmd, "quit") || eq_ignore_ascii_case(cmd, "q") {
-            println("Closing Windows Media Player (player.vex)...");
+        if eq_ignore_ascii_case(cmd, "exit") || eq_ignore_ascii_case(cmd, "q") {
+            println("Exiting VladOS Media Player...");
             break;
         } else if eq_ignore_ascii_case(cmd, "play") || eq_ignore_ascii_case(cmd, "p") {
             is_playing = true;
-            let track = &PLAYLIST[current_track];
-            print("Now Playing: ");
-            print(track.title);
-            print(" - ");
-            println(track.artist);
-            print("File: ");
-            println(track.path);
-
-            // Play synthesized acoustic notes
-            if current_track == 1 {
-                for &(f, d) in &NOTES_CHIME {
-                    unsafe {
-                        sys_beep(f, d as u32);
-                        sys_sleep_ms(d + 20);
-                    }
-                }
-            } else {
-                for &(f, d) in &NOTES_AMBIENT {
-                    unsafe {
-                        sys_beep(f, d as u32);
-                        sys_sleep_ms(d + 15);
-                    }
-                }
-            }
-            unsafe { sys_beep(0, 0) };
-            println("[Playback active. 8254 PIT Timer tone stream completed]");
-        } else if eq_ignore_ascii_case(cmd, "stop") || eq_ignore_ascii_case(cmd, "pause") || eq_ignore_ascii_case(cmd, "s") {
+            play_audio_file(PLAYLIST[current_track].path);
+        } else if eq_ignore_ascii_case(cmd, "stop") {
             is_playing = false;
             unsafe { sys_beep(0, 0) };
-            println("Playback stopped. DAC & PIT channel silenced.");
+            println("Playback stopped.");
+        } else if eq_ignore_ascii_case(cmd, "list") || eq_ignore_ascii_case(cmd, "l") {
+            println("Playlist:");
+            for (idx, track) in PLAYLIST.iter().enumerate() {
+                print(if idx == current_track { " -> " } else { "    " });
+                print_num(idx + 1);
+                print(". ");
+                print(track.title);
+                print(" - ");
+                print(track.artist);
+                print(" (");
+                print(track.duration);
+                println(")");
+            }
         } else if eq_ignore_ascii_case(cmd, "next") || eq_ignore_ascii_case(cmd, "n") {
             current_track = (current_track + 1) % PLAYLIST.len();
-            let track = &PLAYLIST[current_track];
-            print("Switched to Track ");
-            print_num(current_track + 1);
-            print(": ");
-            println(track.title);
+            print("Switched to: ");
+            println(PLAYLIST[current_track].title);
             if is_playing {
-                unsafe { sys_beep(880, 80) };
+                play_audio_file(PLAYLIST[current_track].path);
             }
         } else if eq_ignore_ascii_case(cmd, "prev") {
             current_track = if current_track == 0 { PLAYLIST.len() - 1 } else { current_track - 1 };
-            let track = &PLAYLIST[current_track];
-            print("Switched to Track ");
-            print_num(current_track + 1);
-            print(": ");
-            println(track.title);
-        } else if eq_ignore_ascii_case(cmd, "list") || eq_ignore_ascii_case(cmd, "l") {
-            println("VladOS Windows Media Player Playlist:");
-            for (i, t) in PLAYLIST.iter().enumerate() {
-                if i == current_track {
-                    print(" > ");
-                } else {
-                    print("   ");
-                }
-                print_num(i + 1);
-                print(". ");
-                print(t.title);
-                print(" [");
-                print(t.duration);
-                print("] (");
-                print(t.artist);
-                println(")");
-            }
-        } else if eq_ignore_ascii_case(cmd, "vol") || eq_ignore_ascii_case(cmd, "volume") {
-            if let Some(v_str) = parts.next() {
-                if let Some(v) = parse_u32(v_str) {
-                    volume = v.min(100);
-                    print("Master Volume set to ");
-                    print_num(volume as usize);
-                    println("%");
-                    unsafe { sys_beep(600, 50) };
-                } else {
-                    println("Usage: VOL <0-100>");
-                }
-            } else {
-                print("Current Master Volume: ");
-                print_num(volume as usize);
-                println("%");
+            print("Switched to: ");
+            println(PLAYLIST[current_track].title);
+            if is_playing {
+                play_audio_file(PLAYLIST[current_track].path);
             }
         } else if eq_ignore_ascii_case(cmd, "info") {
             let t = &PLAYLIST[current_track];
-            println("--- Current Track Info ---");
-            print("Title:       "); println(t.title);
+            println("--- Audio Stream Information ---");
+            print("Track Title: "); println(t.title);
             print("Artist:      "); println(t.artist);
             print("Path:        "); println(t.path);
-            print("Duration:    "); println(t.duration);
-            print("Bitrate:     320 kbps High Quality Audio\r\n");
-            print("Hardware:    Realtek ALC887 / Intel HD Audio (AC97/HDA)\r\n");
+            print("Hardware:    Realtek ALC887 / Intel HD Audio\r\n");
             print("Status:      "); println(if is_playing { "Playing" } else { "Stopped" });
             println("--------------------------");
-        } else if eq_ignore_ascii_case(cmd, "help") {
-            println("Media Player Commands:");
-            println("  PLAY / P       - Start playing active track");
-            println("  STOP / PAUSE   - Halt current audio output");
-            println("  NEXT / N       - Advance to next track");
-            println("  PREV           - Return to previous track");
-            println("  LIST / L       - Display current playlist");
-            println("  VOL <level>    - Set volume level (0 to 100)");
-            println("  INFO           - Show technical audio properties");
-            println("  EXIT / Q       - Close player");
         } else {
-            print("Unknown command '");
-            print(cmd);
-            println("'. Type HELP for command list.");
+            println("Commands: PLAY, STOP, NEXT, PREV, LIST, INFO, EXIT");
         }
     }
 
-    loop {
-        unsafe { sys_yield() };
-    }
+    0
 }
 
 fn eq_ignore_ascii_case(a: &str, b: &str) -> bool {
@@ -395,18 +350,6 @@ fn print_num(mut n: usize) {
         let b = [buf[j]];
         print(core::str::from_utf8(&b).unwrap_or(""));
     }
-}
-
-fn parse_u32(s: &str) -> Option<u32> {
-    let mut val = 0u32;
-    for b in s.bytes() {
-        if b >= b'0' && b <= b'9' {
-            val = val.checked_mul(10)?.checked_add((b - b'0') as u32)?;
-        } else {
-            return None;
-        }
-    }
-    Some(val)
 }
 
 #[panic_handler]

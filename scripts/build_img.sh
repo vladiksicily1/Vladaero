@@ -28,14 +28,19 @@ if [ ! -f "$MKFS_VLADFS" ]; then
     cargo build --manifest-path "$REPO_DIR/components/vladfs/Cargo.toml" --release
 fi
 
-echo "1. Building VladOS Binaries (cmd, explorer, vladinit, notepad, calc, diskutil, pathedit)..."
-RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/cmd/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
-    cargo build --manifest-path "$REPO_DIR/components/cmd/Cargo.toml" --target x86_64-unknown-none --release
-CMD_BIN="$REPO_DIR/components/cmd/target/x86_64-unknown-none/release/cmd_bin"
+echo "1. Building VladOS Binaries (dwm, explorer, cmd, vladinit, notepad, calc, diskutil, pathedit, player, photos, whoami, sysinfo, net, diskpart, shutdown, chkdsk)..."
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/dwm/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/dwm/Cargo.toml" --target x86_64-unknown-none --release
+DWM_BIN="$REPO_DIR/components/dwm/target/x86_64-unknown-none/release/dwm_bin"
 
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/explorer/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/explorer/Cargo.toml" --target x86_64-unknown-none --release
 EXPLORER_BIN="$REPO_DIR/components/explorer/target/x86_64-unknown-none/release/explorer_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/cmd/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/cmd/Cargo.toml" --target x86_64-unknown-none --release
+CMD_BIN="$REPO_DIR/components/cmd/target/x86_64-unknown-none/release/cmd_bin"
 
 RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/vladinit/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
     cargo build --manifest-path "$REPO_DIR/components/vladinit/Cargo.toml" --target x86_64-unknown-none --release
@@ -65,6 +70,38 @@ RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/photos/
     cargo build --manifest-path "$REPO_DIR/components/photos/Cargo.toml" --target x86_64-unknown-none --release
 PHOTOS_BIN="$REPO_DIR/components/photos/target/x86_64-unknown-none/release/photos_bin"
 
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/whoami/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/whoami/Cargo.toml" --target x86_64-unknown-none --release
+WHOAMI_BIN="$REPO_DIR/components/whoami/target/x86_64-unknown-none/release/whoami_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/sysinfo/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/sysinfo/Cargo.toml" --target x86_64-unknown-none --release
+SYSINFO_BIN="$REPO_DIR/components/sysinfo/target/x86_64-unknown-none/release/sysinfo_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/net/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/net/Cargo.toml" --target x86_64-unknown-none --release
+NET_BIN="$REPO_DIR/components/net/target/x86_64-unknown-none/release/net_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/diskpart/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/diskpart/Cargo.toml" --target x86_64-unknown-none --release
+DISKPART_BIN="$REPO_DIR/components/diskpart/target/x86_64-unknown-none/release/diskpart_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/shutdown/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/shutdown/Cargo.toml" --target x86_64-unknown-none --release
+SHUTDOWN_BIN="$REPO_DIR/components/shutdown/target/x86_64-unknown-none/release/shutdown_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/chkdsk/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/chkdsk/Cargo.toml" --target x86_64-unknown-none --release
+CHKDSK_BIN="$REPO_DIR/components/chkdsk/target/x86_64-unknown-none/release/chkdsk_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/format/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/format/Cargo.toml" --target x86_64-unknown-none --release
+FORMAT_BIN="$REPO_DIR/components/format/target/x86_64-unknown-none/release/format_bin"
+
+RUSTFLAGS="-C relocation-model=static -C link-arg=-T$REPO_DIR/components/mount/link.ld -C link-arg=-z -C link-arg=max-page-size=0x1000" \
+    cargo build --manifest-path "$REPO_DIR/components/mount/Cargo.toml" --target x86_64-unknown-none --release
+MOUNT_BIN="$REPO_DIR/components/mount/target/x86_64-unknown-none/release/mount_bin"
+
 echo "2. Preparing VladOS system root ($SYSROOT_DIR)..."
 mkdir -p "$SYSROOT_DIR/VladOS/System32/config"
 mkdir -p "$SYSROOT_DIR/VladOS/System32/drivers"
@@ -83,6 +120,8 @@ mkdir -p "$SYSROOT_DIR/Programs"
 # Install binaries into /VladOS/System32/
 cp "$VLADINIT_BIN" "$SYSROOT_DIR/VladOS/System32/vladinit.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/vladinit.vex"
+cp "$DWM_BIN" "$SYSROOT_DIR/VladOS/System32/dwm.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/dwm.vex"
 cp "$EXPLORER_BIN" "$SYSROOT_DIR/VladOS/System32/explorer.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/explorer.vex"
 cp "$CMD_BIN" "$SYSROOT_DIR/VladOS/System32/cmd.vex"
@@ -99,6 +138,22 @@ cp "$PLAYER_BIN" "$SYSROOT_DIR/VladOS/System32/player.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/player.vex"
 cp "$PHOTOS_BIN" "$SYSROOT_DIR/VladOS/System32/photos.vex"
 chmod +x "$SYSROOT_DIR/VladOS/System32/photos.vex"
+cp "$WHOAMI_BIN" "$SYSROOT_DIR/VladOS/System32/whoami.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/whoami.vex"
+cp "$SYSINFO_BIN" "$SYSROOT_DIR/VladOS/System32/sysinfo.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/sysinfo.vex"
+cp "$NET_BIN" "$SYSROOT_DIR/VladOS/System32/net.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/net.vex"
+cp "$DISKPART_BIN" "$SYSROOT_DIR/VladOS/System32/diskpart.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/diskpart.vex"
+cp "$SHUTDOWN_BIN" "$SYSROOT_DIR/VladOS/System32/shutdown.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/shutdown.vex"
+cp "$CHKDSK_BIN" "$SYSROOT_DIR/VladOS/System32/chkdsk.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/chkdsk.vex"
+cp "$FORMAT_BIN" "$SYSROOT_DIR/VladOS/System32/format.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/format.vex"
+cp "$MOUNT_BIN" "$SYSROOT_DIR/VladOS/System32/mount.vex"
+chmod +x "$SYSROOT_DIR/VladOS/System32/mount.vex"
 
 mkdir -p "$SYSROOT_DIR/VladOS/System32/Config"
 cat << 'EOF' > "$SYSROOT_DIR/VladOS/System32/Config/path.cfg"
@@ -198,6 +253,7 @@ Architecture=x86_64
 BuildDate=2026-09-05
 Kernel=kernel.elf
 Init=/VladOS/System32/vladinit.vex
+Compositor=/VladOS/System32/dwm.vex
 Shell=/VladOS/System32/explorer.vex
 Terminal=/VladOS/System32/cmd.vex
 LogonUI=enabled

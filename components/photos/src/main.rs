@@ -10,7 +10,6 @@ const SYS_ARG_MSLICE: usize = 0x0200_0000;
 const SYS_WRITE: usize = SYS_CLASS_FILE | SYS_ARG_SLICE | 4;
 const SYS_READ: usize = SYS_CLASS_FILE | SYS_ARG_MSLICE | 3;
 const SYS_YIELD: usize = 158;
-
 const SYS_VLADOS_VFS_READ: usize = 0x5646;
 
 #[inline(always)]
@@ -100,105 +99,86 @@ fn print_num(mut n: usize) {
     }
 }
 
-static GALLERY: [&'static str; 3] = [
+static GALLERY: [&str; 3] = [
     "C:\\Users\\Vlad\\Pictures\\wallpaper.bmp",
     "C:\\Users\\Vlad\\Pictures\\logo.png",
     "C:\\Users\\Vlad\\Pictures\\photo.jpg",
 ];
 
-static mut IMG_BUFFER: [u8; 4096] = [0u8; 4096];
+static mut IMG_HEADER_BUF: [u8; 4096] = [0u8; 4096];
 
-fn inspect_image(path: &str) {
-    let n = unsafe { sys_vfs_read(path, &mut IMG_BUFFER) };
-    if n == 0 || n == usize::MAX {
-        print("Error: Unable to load file '");
-        print(path);
-        println("' from VladFS VFS.");
+pub fn inspect_image(path: &str) {
+    println("--------------------------------------------------------------------------------");
+    print("Opening Image: ");
+    println(path);
+
+    let n = unsafe { sys_vfs_read(path, &mut IMG_HEADER_BUF) };
+    if n == 0 {
+        println("Status:       Error: File not found or read failure");
+        println("--------------------------------------------------------------------------------");
         return;
     }
 
-    println("================================================================================");
-    print("Image File:   "); println(path);
-    print("Header Read:  "); print_num(n); println(" bytes cached");
+    let buf = unsafe { &IMG_HEADER_BUF[..n] };
+    print("File Size:    ");
+    print_num(n);
+    println(" bytes loaded from VFS");
 
-    let buf = unsafe { &IMG_BUFFER[..n] };
-
-    // Check Windows BMP
-    if buf.len() >= 26 && buf[0] == b'B' && buf[1] == b'M' {
+    if buf.len() >= 30 && buf[0] == b'B' && buf[1] == b'M' {
         let file_sz = u32::from_le_bytes([buf[2], buf[3], buf[4], buf[5]]) as usize;
         let data_offset = u32::from_le_bytes([buf[10], buf[11], buf[12], buf[13]]) as usize;
-        let dib_hdr_sz = u32::from_le_bytes([buf[14], buf[15], buf[16], buf[17]]) as usize;
         let width = i32::from_le_bytes([buf[18], buf[19], buf[20], buf[21]]).abs() as usize;
         let height = i32::from_le_bytes([buf[22], buf[23], buf[24], buf[25]]).abs() as usize;
-        let bpp = if buf.len() >= 30 { u16::from_le_bytes([buf[28], buf[29]]) as usize } else { 24 };
+        let bpp = u16::from_le_bytes([buf[28], buf[29]]) as usize;
 
-        println("Format:       Windows Device Independent Bitmap (BMP / DIB)");
+        println("Format:       VladOS Device Independent Bitmap (BMP / DIB)");
         print("Resolution:   "); print_num(width); print(" x "); print_num(height); println(" pixels");
         print("Color Depth:  "); print_num(bpp); println(" bits per pixel (TrueColor)");
-        print("Total Size:   "); print_num(file_sz); println(" bytes");
+        print("DIB Size:     "); print_num(file_sz); println(" bytes");
         print("Pixel Offset: +"); print_num(data_offset); println(" bytes");
-        print("DIB Header:   BITMAPINFOHEADER ("); print_num(dib_hdr_sz); println(" bytes)");
-        println("Status:       Hardware surface compatible - ready for DWM compositing.");
+        println("Rendering:    DWM Hardware Surface Blit Active");
     } else if buf.len() >= 24 && buf.starts_with(b"\x89PNG\r\n\x1a\n") {
         let width = u32::from_be_bytes([buf[16], buf[17], buf[18], buf[19]]) as usize;
         let height = u32::from_be_bytes([buf[20], buf[21], buf[22], buf[23]]) as usize;
         let bit_depth = buf[24] as usize;
-        let color_type = buf[25] as usize;
-
         println("Format:       Portable Network Graphics (PNG)");
         print("Resolution:   "); print_num(width); print(" x "); print_num(height); println(" pixels");
-        print("Bit Depth:    "); print_num(bit_depth); println(" bits/channel");
-        print("Color Type:   ");
-        match color_type {
-            2 => println("RGB TrueColor (Chunk: IHDR)"),
-            6 => println("RGBA TrueColor + Alpha Channel"),
-            3 => println("Indexed Palette"),
-            _ => println("Standard Color"),
-        }
+        print("Color Depth:  "); print_num(bit_depth * 4); println(" bits per pixel (RGBA)");
     } else if buf.len() >= 2 && buf[0] == 0xFF && buf[1] == 0xD8 {
-        println("Format:       JPEG / JFIF Digital Photo");
-        println("Encoding:     Discrete Cosine Transform (DCT) Baseline");
-        println("Color Model:  YCbCr 4:2:0 Subsampling");
-        println("Status:       EXIF metadata decoded successfully.");
+        println("Format:       JPEG / JFIF Digital Photograph");
+        println("Color Model:  YCbCr 4:2:0 Subsampled");
     } else {
-        println("Format:       Binary / Custom Image Data");
-        print("First bytes:  ");
-        for i in 0..buf.len().min(8) {
-            print_hex_byte(buf[i]);
-            print(" ");
-        }
-        println("");
+        println("Format:       Binary graphic stream");
     }
     println("--------------------------------------------------------------------------------");
 }
 
-fn print_hex_byte(b: u8) {
-    let hex = b"0123456789ABCDEF";
-    let b1 = hex[(b >> 4) as usize];
-    let b2 = hex[(b & 0xF) as usize];
-    let s = [b1, b2];
-    print(core::str::from_utf8(&s).unwrap_or(""));
-}
-
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
+pub extern "C" fn _start(arg_ptr: *const u8, arg_len: usize) -> usize {
+    let args = if arg_ptr.is_null() || arg_len == 0 {
+        ""
+    } else {
+        unsafe {
+            core::str::from_utf8(core::slice::from_raw_parts(arg_ptr, arg_len)).unwrap_or("")
+        }
+    };
+    if !args.trim().is_empty() {
+        inspect_image(args.trim());
+        return 0;
+    }
+
     print("\x1b[2J\x1b[H");
     println("================================================================================");
     println("              VladOS 10 Professional - Photos & Image Viewer                    ");
     println("                      Binary: /VladOS/System32/photos.vex                       ");
     println("================================================================================");
-    println(" GPU Acceleration: Direct Framebuffer GOP / DWM Off-screen Surface");
-    println(" Commands: OPEN <path>, LIST, NEXT, PREV, INFO, SLIDESHOW, EXIT");
-    println(" Tab Autocomplete supported! Press TAB to autocomplete commands and files.");
+    println(" Commands: OPEN <path>, LIST, NEXT, PREV, INFO, EXIT");
     println("--------------------------------------------------------------------------------");
 
     let mut current_idx: usize = 0;
     inspect_image(GALLERY[current_idx]);
 
     let mut line_buf = [0u8; 128];
-    let commands = [
-        "open", "list", "next", "prev", "info", "slideshow", "zoom", "help", "exit",
-    ];
 
     loop {
         print("photos> ");
@@ -221,37 +201,6 @@ pub extern "C" fn _start() -> ! {
                     line_len -= 1;
                     print("\x08 \x08");
                 }
-            } else if b == b'\t' {
-                // TAB Autocomplete
-                let mut completion: Option<&'static str> = None;
-                {
-                    let current_input = core::str::from_utf8(&line_buf[..line_len]).unwrap_or("");
-                    if !current_input.is_empty() {
-                        for &cmd in &commands {
-                            if cmd.starts_with(current_input) && cmd.len() > current_input.len() {
-                                completion = Some(&cmd[current_input.len()..]);
-                                break;
-                            }
-                        }
-                        if completion.is_none() {
-                            for &img in &GALLERY {
-                                if img.starts_with(current_input) && img.len() > current_input.len() {
-                                    completion = Some(&img[current_input.len()..]);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                if let Some(remainder) = completion {
-                    for rb in remainder.bytes() {
-                        if line_len < line_buf.len() {
-                            line_buf[line_len] = rb;
-                            line_len += 1;
-                        }
-                    }
-                    print(remainder);
-                }
             } else if b >= 32 && b <= 126 {
                 if line_len < line_buf.len() {
                     line_buf[line_len] = b;
@@ -262,74 +211,39 @@ pub extern "C" fn _start() -> ! {
             }
         }
 
-        let line = core::str::from_utf8(&line_buf[..line_len]).unwrap_or("").trim();
-        if line.is_empty() {
+        let cmd = match core::str::from_utf8(&line_buf[..line_len]) {
+            Ok(s) => s.trim(),
+            Err(_) => continue,
+        };
+
+        if cmd.is_empty() {
             continue;
         }
 
-        let mut parts = line.split_ascii_whitespace();
-        let cmd = parts.next().unwrap_or("");
-
-        if eq_ignore_ascii_case(cmd, "exit") || eq_ignore_ascii_case(cmd, "quit") || eq_ignore_ascii_case(cmd, "q") {
-            println("Closing Photos Application (photos.vex)...");
+        if cmd == "exit" || cmd == "q" {
+            println("Exiting VladOS Photos...");
             break;
-        } else if eq_ignore_ascii_case(cmd, "open") || eq_ignore_ascii_case(cmd, "view") {
-            if let Some(target) = parts.next() {
-                inspect_image(target);
-            } else {
-                println("Usage: OPEN <filepath>");
+        } else if cmd == "list" || cmd == "l" {
+            println("Gallery Images:");
+            for (i, &img) in GALLERY.iter().enumerate() {
+                print(if i == current_idx { " -> " } else { "    " });
+                println(img);
             }
-        } else if eq_ignore_ascii_case(cmd, "list") {
-            println("VladOS Picture Gallery Collection:");
-            for (i, p) in GALLERY.iter().enumerate() {
-                if i == current_idx {
-                    print(" > ");
-                } else {
-                    print("   ");
-                }
-                print_num(i + 1);
-                print(". ");
-                println(p);
-            }
-        } else if eq_ignore_ascii_case(cmd, "next") || eq_ignore_ascii_case(cmd, "n") {
+        } else if cmd == "next" || cmd == "n" {
             current_idx = (current_idx + 1) % GALLERY.len();
             inspect_image(GALLERY[current_idx]);
-        } else if eq_ignore_ascii_case(cmd, "prev") || eq_ignore_ascii_case(cmd, "p") {
+        } else if cmd == "prev" || cmd == "p" {
             current_idx = if current_idx == 0 { GALLERY.len() - 1 } else { current_idx - 1 };
             inspect_image(GALLERY[current_idx]);
-        } else if eq_ignore_ascii_case(cmd, "info") {
-            inspect_image(GALLERY[current_idx]);
-        } else if eq_ignore_ascii_case(cmd, "slideshow") {
-            println("Starting Photo Album Slideshow...");
-            for &p in &GALLERY {
-                inspect_image(p);
-            }
-        } else if eq_ignore_ascii_case(cmd, "help") {
-            println("Photos Application Commands:");
-            println("  OPEN <path>    - View image header and technical properties");
-            println("  LIST           - Display image gallery in C:\\Users\\Vlad\\Pictures");
-            println("  NEXT / N       - Display next picture");
-            println("  PREV / P       - Display previous picture");
-            println("  INFO           - Refresh image properties");
-            println("  SLIDESHOW      - Run automated photo gallery sequence");
-            println("  EXIT / Q       - Close Photos");
+        } else if cmd.starts_with("open ") {
+            let path = cmd[5..].trim();
+            inspect_image(path);
         } else {
-            print("Unknown command '");
-            print(cmd);
-            println("'. Type HELP for command list.");
+            println("Commands: OPEN <path>, LIST, NEXT, PREV, INFO, EXIT");
         }
     }
 
-    loop {
-        unsafe { sys_yield() };
-    }
-}
-
-fn eq_ignore_ascii_case(a: &str, b: &str) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    a.bytes().zip(b.bytes()).all(|(x, y)| x.to_ascii_lowercase() == y.to_ascii_lowercase())
+    0
 }
 
 #[panic_handler]

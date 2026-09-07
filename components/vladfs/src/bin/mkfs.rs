@@ -271,12 +271,32 @@ impl VladFsBuilder {
             serialized.extend_from_slice(bytes);
         }
 
-        let parent_rec = &mut self.records[parent_id as usize];
         if serialized.len() <= RESIDENT_DATA_CAPACITY {
+            let parent_rec = &mut self.records[parent_id as usize];
             parent_rec.file_size = serialized.len() as u64;
             parent_rec.flags |= FLAG_RESIDENT;
             unsafe {
                 parent_rec.data.resident[..serialized.len()].copy_from_slice(&serialized);
+            }
+        } else {
+            let block_count = serialized.len().div_ceil(BLOCK_SIZE) as u32;
+            let block_start = self.allocate_blocks(block_count);
+            let parent_rec = &mut self.records[parent_id as usize];
+            parent_rec.flags &= !FLAG_RESIDENT;
+            parent_rec.file_size = serialized.len() as u64;
+            parent_rec.allocated_size = (block_count as u64) * (BLOCK_SIZE as u64);
+            parent_rec.extent_count = 1;
+
+            let mut extents = [Extent { block_start: 0, block_count: 0, flags: 0 }; MAX_EXTENTS];
+            extents[0] = Extent { block_start, block_count, flags: 0 };
+            parent_rec.data.extents = extents;
+
+            self.file.seek(SeekFrom::Start(block_start * BLOCK_SIZE as u64)).unwrap();
+            self.file.write_all(&serialized).unwrap();
+
+            let remainder = (block_count as usize * BLOCK_SIZE) - serialized.len();
+            if remainder > 0 {
+                self.file.write_all(&vec![0u8; remainder]).unwrap();
             }
         }
     }

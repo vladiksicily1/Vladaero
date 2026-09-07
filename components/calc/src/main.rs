@@ -63,6 +63,27 @@ fn println(s: &str) {
     print("\r\n");
 }
 
+fn parse_num(s: &str) -> Option<i64> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let (neg, s) = if let Some(stripped) = s.strip_prefix('-') {
+        (true, stripped)
+    } else {
+        (false, s)
+    };
+    let mut val: i64 = 0;
+    for b in s.bytes() {
+        if b >= b'0' && b <= b'9' {
+            val = val.checked_mul(10)?.checked_add((b - b'0') as i64)?;
+        } else {
+            return None;
+        }
+    }
+    Some(if neg { -val } else { val })
+}
+
 fn print_i64(mut n: i64) {
     if n == 0 {
         print("0");
@@ -72,7 +93,7 @@ fn print_i64(mut n: i64) {
         print("-");
         n = -n;
     }
-    let mut buf = [0u8; 32];
+    let mut buf = [0u8; 20];
     let mut i = 0;
     while n > 0 {
         buf[i] = b'0' + (n % 10) as u8;
@@ -85,8 +106,70 @@ fn print_i64(mut n: i64) {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+pub fn evaluate_expr(expr: &str) {
+    let mut op_idx = None;
+    let mut op_char = ' ';
+    for (i, c) in expr.char_indices() {
+        if i > 0 && (c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '^') {
+            op_idx = Some(i);
+            op_char = c;
+            break;
+        }
+    }
+
+    if let Some(idx) = op_idx {
+        let left_str = expr[..idx].trim();
+        let right_str = expr[idx + 1..].trim();
+
+        let left_num = parse_num(left_str);
+        let right_num = parse_num(right_str);
+
+        match (left_num, right_num) {
+            (Some(a), Some(b)) => {
+                print("= ");
+                match op_char {
+                    '+' => print_i64(a.wrapping_add(b)),
+                    '-' => print_i64(a.wrapping_sub(b)),
+                    '*' => print_i64(a.wrapping_mul(b)),
+                    '/' => {
+                        if b == 0 {
+                            print("Error: Division by zero");
+                        } else {
+                            print_i64(a / b);
+                        }
+                    }
+                    '%' => {
+                        if b == 0 {
+                            print("Error: Modulo by zero");
+                        } else {
+                            print_i64(a % b);
+                        }
+                    }
+                    '^' => {
+                        let mut res = 1i64;
+                        for _ in 0..b {
+                            res = res.wrapping_mul(a);
+                        }
+                        print_i64(res);
+                    }
+                    _ => {}
+                }
+                println("");
+            }
+            _ => {
+                println("Syntax Error: Invalid operands");
+            }
+        }
+    } else if let Some(n) = parse_num(expr) {
+        print("= ");
+        print_i64(n);
+        println("");
+    } else {
+        println("Syntax Error: Unknown expression");
+    }
+}
+
+pub fn run_calc_interactive() {
     print("\x1b[2J\x1b[H");
     println("================================================================================");
     println("                    VladOS 10 Professional - Calculator                         ");
@@ -134,98 +217,29 @@ pub extern "C" fn _start() -> ! {
             continue;
         }
 
-        // Parse binary expression: <num1> <op> <num2>
-        let mut op_idx = None;
-        let mut op_char = ' ';
-        for (i, c) in expr.char_indices() {
-            if i > 0 && (c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '^') {
-                op_idx = Some(i);
-                op_char = c;
-                break;
-            }
-        }
-
-        if let Some(idx) = op_idx {
-            let left_str = expr[..idx].trim();
-            let right_str = expr[idx + 1..].trim();
-
-            let left_num = parse_num(left_str);
-            let right_num = parse_num(right_str);
-
-            match (left_num, right_num) {
-                (Some(a), Some(b)) => {
-                    print("= ");
-                    match op_char {
-                        '+' => print_i64(a.wrapping_add(b)),
-                        '-' => print_i64(a.wrapping_sub(b)),
-                        '*' => print_i64(a.wrapping_mul(b)),
-                        '/' => {
-                            if b == 0 {
-                                print("Error: Division by zero");
-                            } else {
-                                print_i64(a / b);
-                            }
-                        }
-                        '%' => {
-                            if b == 0 {
-                                print("Error: Modulo by zero");
-                            } else {
-                                print_i64(a % b);
-                            }
-                        }
-                        '^' => {
-                            let mut res = 1i64;
-                            for _ in 0..b {
-                                res = res.wrapping_mul(a);
-                            }
-                            print_i64(res);
-                        }
-                        _ => print("Unknown operator"),
-                    }
-                    println("");
-                }
-                _ => println("Syntax error: invalid number format"),
-            }
-        } else {
-            if let Some(n) = parse_num(expr) {
-                print("= ");
-                print_i64(n);
-                println("");
-            } else {
-                println("Unknown expression. Example: 45 * 12 or 1024 + 512");
-            }
-        }
-    }
-
-    loop {
-        unsafe { sys_yield() };
+        evaluate_expr(expr);
     }
 }
 
-fn parse_num(s: &str) -> Option<i64> {
-    let s = s.trim();
-    if s.is_empty() {
-        return None;
-    }
-    let (neg, s) = if s.starts_with('-') {
-        (true, &s[1..])
+#[no_mangle]
+pub extern "C" fn _start(arg_ptr: *const u8, arg_len: usize) -> usize {
+    let args = if arg_ptr.is_null() || arg_len == 0 {
+        ""
     } else {
-        (false, s)
-    };
-    let mut val = 0i64;
-    for b in s.bytes() {
-        if b >= b'0' && b <= b'9' {
-            val = val.checked_mul(10)?.checked_add((b - b'0') as i64)?;
-        } else {
-            return None;
+        unsafe {
+            core::str::from_utf8(core::slice::from_raw_parts(arg_ptr, arg_len)).unwrap_or("")
         }
+    };
+    if !args.trim().is_empty() {
+        evaluate_expr(args.trim());
+    } else {
+        run_calc_interactive();
     }
-    Some(if neg { -val } else { val })
+    0
 }
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    print("\r\n[Calculator Panic]\r\n");
     loop {
         unsafe { sys_yield() };
     }
