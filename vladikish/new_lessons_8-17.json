@@ -1,0 +1,1049 @@
+[
+  {
+    "id": 24,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 8: Семья и близкие",
+    "xp_reward": 25,
+    "order_num": 8,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Что означает слово 'Familia'?",
+        "prompt": "Familia",
+        "options": [
+          "Семья",
+          "Дом",
+          "Город",
+          "Книга"
+        ],
+        "correct": 0,
+        "explanation": "'Familia' означает 'Семья, род, семейный круг'."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите фразу 'Моя семья — моя радость':",
+        "prompt": "Моя семья — моя радость",
+        "correct_sequence": [
+          "Mea",
+          "familia",
+          "est",
+          "mea",
+          "alegria!"
+        ],
+        "word_pool": [
+          "Mea",
+          "familia",
+          "est",
+          "mea",
+          "alegria!",
+          "urbi",
+          "panu",
+          "nox"
+        ],
+        "explanation": "Mea = моя, familia = семья, est = есть, alegria = радость."
+      },
+      {
+        "type": "match_pairs",
+        "question": "Сопоставьте членов семьи с переводом:",
+        "pairs": [
+          {
+            "left": "Matro",
+            "right": "Мама"
+          },
+          {
+            "left": "Patro",
+            "right": "Папа"
+          },
+          {
+            "left": "Fratro",
+            "right": "Брат"
+          },
+          {
+            "left": "Sora",
+            "right": "Сестра"
+          }
+        ],
+        "explanation": "Отлично! Вы запомнили главных членов семьи."
+      },
+      {
+        "type": "fill_blank",
+        "question": "Вставьте нужное слово 'семья':",
+        "sentence": "Me toro mea ___ tre!",
+        "options": [
+          "familia",
+          "kafo",
+          "aero"
+        ],
+        "correct_word": "familia",
+        "translation": "Я очень люблю свою семью!",
+        "explanation": "'Me toro mea familia (tre)!' = 'Я (очень) люблю свою семью!'"
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Ответьте Сибе, кто эта девушка рядом:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Kwis est ela? Ela est kara?",
+        "prompt_translation": "Кто она? Она дорогая тебе?",
+        "options": [
+          "Ela est mea sora, fideli amiko!",
+          "No, me no koma panu.",
+          "Kafo caldi, danko."
+        ],
+        "correct": 0,
+        "explanation": "'Ela est mea sora, fideli amiko!' = 'Она моя сестра, верный друг!'"
+      },
+      {
+        "type": "judge",
+        "question": "Оцените утверждение:",
+        "prompt": "Filia",
+        "statement": "Это слово означает 'Сын'",
+        "is_true": false,
+        "explanation": "Неверно! 'Filia' = 'дочь', а 'Fili' = 'сын/ребенок'."
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 9: Мой дом и где я живу",
+    "xp_reward": 25,
+    "order_num": 9,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Что означает слово 'Domi'?",
+        "prompt": "Domi",
+        "options": [
+          "Дом / домашний очаг",
+          "Город",
+          "Море",
+          "Книга"
+        ],
+        "correct": 0,
+        "explanation": "'Domi' = 'Дом, домашний очаг' — место тепла и уюта."
+      },
+      {
+        "type": "find_error",
+        "question": "Найдите ошибочное слово в предложении:",
+        "sentence_words": [
+          "Me",
+          "vivi",
+          "in",
+          "urbi",
+          "kuri"
+        ],
+        "error_word": "kuri",
+        "translation": "Я живу в городе",
+        "explanation": "'kuri' (бежать) здесь лишнее. Правильно: 'Me vivi in urbi.'"
+      },
+      {
+        "type": "translate",
+        "question": "Переведите фразу на русский:",
+        "prompt": "Me vivi in bela domi.",
+        "correct_answers": [
+          "Я живу в красивом доме",
+          "Я живу в красивом доме.",
+          "Живу в красивом доме"
+        ],
+        "explanation": "Me = я, vivi = живу, in = в, bela = красивый, domi = дом."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите фразу 'Я живу в городе':",
+        "prompt": "Я живу в городе",
+        "correct_sequence": [
+          "Me",
+          "vivi",
+          "in",
+          "urbi."
+        ],
+        "word_pool": [
+          "Me",
+          "vivi",
+          "in",
+          "urbi.",
+          "kasa",
+          "aero",
+          "panu"
+        ],
+        "explanation": "Me vivi in urbi. = Я живу в городе."
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Ответьте на вопрос Сибы, где вы живёте:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Unde tu vivi, amiko?",
+        "prompt_translation": "Где ты живёшь, друг?",
+        "options": [
+          "Me vivi in urbi, apud parko.",
+          "Me toro kafo.",
+          "Nox est kalma."
+        ],
+        "correct": 0,
+        "explanation": "'Me vivi in urbi, apud parko.' = 'Я живу в городе, рядом с парком.'"
+      },
+      {
+        "type": "listen_tap",
+        "question": "Соберите услышанное предложение:",
+        "prompt": "Me vivi in bela domi",
+        "correct_sequence": [
+          "Me",
+          "vivi",
+          "in",
+          "bela",
+          "domi"
+        ],
+        "word_pool": [
+          "Me",
+          "vivi",
+          "in",
+          "bela",
+          "domi",
+          "urbi",
+          "kuri",
+          "flora"
+        ],
+        "explanation": "'Me vivi in bela domi' = 'Я живу в красивом доме'."
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 10: Числа, возраст и счёт",
+    "xp_reward": 25,
+    "order_num": 10,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Какое число означает 'Tria'?",
+        "prompt": "Tria",
+        "options": [
+          "Три",
+          "Два",
+          "Пять",
+          "Десять"
+        ],
+        "correct": 0,
+        "explanation": "'Tria' = три. Una=1, Dua=2, Tria=3, Kwatro=4."
+      },
+      {
+        "type": "match_pairs",
+        "question": "Сопоставьте числительные:",
+        "pairs": [
+          {
+            "left": "Una",
+            "right": "Один"
+          },
+          {
+            "left": "Dua",
+            "right": "Два"
+          },
+          {
+            "left": "Kwatro",
+            "right": "Четыре"
+          },
+          {
+            "left": "Kinki",
+            "right": "Пять"
+          }
+        ],
+        "explanation": "Базовые числа Vladikish: Una, Dua, Tria, Kwatro, Kinki."
+      },
+      {
+        "type": "fill_blank",
+        "question": "Вставьте числительное 'десять':",
+        "sentence": "Me havi ___ anis.",
+        "options": [
+          "deka",
+          "una",
+          "rubu"
+        ],
+        "correct_word": "deka",
+        "translation": "Мне десять лет (я имею десять лет)",
+        "explanation": "'Me havi deka anis.' — конструкция 'иметь годы' для возраста."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите фразу 'Мне двадцать лет':",
+        "prompt": "Мне двадцать лет",
+        "correct_sequence": [
+          "Me",
+          "havi",
+          "dua-deka",
+          "anis."
+        ],
+        "word_pool": [
+          "Me",
+          "havi",
+          "dua-deka",
+          "anis.",
+          "panu",
+          "domi",
+          "vivi"
+        ],
+        "explanation": "Dua-deka = двадцать (2*10), anis = лет (мн. от ani = год)."
+      },
+      {
+        "type": "judge",
+        "question": "Оцените утверждение:",
+        "prompt": "Kinki",
+        "statement": "Это слово означает 'Пять'",
+        "is_true": true,
+        "explanation": "Верно! Kinki = 5, Sesta = 6, Septi = 7, Okto = 8."
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Ответьте Сибе о своём возрасте:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Kvanti anis tu havi, amiko?",
+        "prompt_translation": "Сколько лет тебе, друг?",
+        "options": [
+          "Me havi dua-deka anis!",
+          "Me vivi in urbi.",
+          "Plaso, kafe?"
+        ],
+        "correct": 0,
+        "explanation": "'Me havi dua-deka anis!' = 'Мне 20 лет!'"
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 11: Откуда ты? Страны и города",
+    "xp_reward": 25,
+    "order_num": 11,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Как спросить 'Откуда ты?' вежливо?",
+        "prompt": "Откуда ты?",
+        "options": [
+          "Unde tu veni?",
+          "Komo sta tu?",
+          "Kwis est tu?",
+          "Kwo tu koma?"
+        ],
+        "correct": 0,
+        "explanation": "'Unde tu veni?' буквально 'Откуда ты приходишь?' — откуда ты родом."
+      },
+      {
+        "type": "translate",
+        "question": "Переведите на русский:",
+        "prompt": "Me veni de Urbi de Lumi.",
+        "correct_answers": [
+          "Я из Города Света",
+          "Я из города света",
+          "Я прибыл из Города Света"
+        ],
+        "explanation": "Me veni = я прихожу/из, de = из, Urbi de Lumi = Город Света."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите фразу 'Я живу в Городе Света':",
+        "prompt": "Я живу в Городе Света",
+        "correct_sequence": [
+          "Me",
+          "vivi",
+          "in",
+          "Urbi",
+          "de",
+          "Lumi."
+        ],
+        "word_pool": [
+          "Me",
+          "vivi",
+          "in",
+          "Urbi",
+          "de",
+          "Lumi.",
+          "kasa",
+          "aero"
+        ],
+        "explanation": "Urbi de Lumi = Город Света, выдуманная столица Vladikish."
+      },
+      {
+        "type": "fill_blank",
+        "question": "Вставьте предлог 'из':",
+        "sentence": "Me veni ___ Urbi.",
+        "options": [
+          "de",
+          "a",
+          "in"
+        ],
+        "correct_word": "de",
+        "translation": "Я из города.",
+        "explanation": "Предлог de = из / от (притяжательность и происхождение)."
+      },
+      {
+        "type": "find_error",
+        "question": "Найдите лишнее слово:",
+        "sentence_words": [
+          "Me",
+          "veni",
+          "de",
+          "urbi",
+          "koma"
+        ],
+        "error_word": "koma",
+        "translation": "Я из города",
+        "explanation": "'koma' (кушать) лишнее. Правильно: 'Me veni de urbi.'"
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Поддержите диалог о происхождении:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Unde tu veni? Tu est de granda urbi?",
+        "prompt_translation": "Откуда ты? Ты из большого города?",
+        "options": [
+          "Si, me veni de bela urbi!",
+          "No, me no koma.",
+          "Zora bonu est."
+        ],
+        "correct": 0,
+        "explanation": "'Si, me veni de bela urbi!' = 'Да, я из красивого города!'"
+      }
+    ]
+  },
+  {
+    "id": 28,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 12: Цвета и описания",
+    "xp_reward": 25,
+    "order_num": 12,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Что означает 'Ruba'?",
+        "prompt": "Ruba",
+        "options": [
+          "Красный / алый",
+          "Синий",
+          "Белый",
+          "Чёрный"
+        ],
+        "correct": 0,
+        "explanation": "'Ruba' = красный, 'Blua' = синий, 'Blanka' = белый, 'Nigra' = чёрный."
+      },
+      {
+        "type": "match_pairs",
+        "question": "Сопоставьте цвета:",
+        "pairs": [
+          {
+            "left": "Ruba",
+            "right": "Красный"
+          },
+          {
+            "left": "Blua",
+            "right": "Синий"
+          },
+          {
+            "left": "Blanka",
+            "right": "Белый"
+          },
+          {
+            "left": "Nigra",
+            "right": "Чёрный"
+          }
+        ],
+        "explanation": "Базовые цвета Vladikish часто оканчиваются на -a."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите фразу 'Синее небо красивое':",
+        "prompt": "Синее небо красивое",
+        "correct_sequence": [
+          "Blua",
+          "aero",
+          "est",
+          "bala!"
+        ],
+        "word_pool": [
+          "Blua",
+          "aero",
+          "est",
+          "bala!",
+          "ruba",
+          "panu",
+          "domi"
+        ],
+        "explanation": "Blua aero est bala! = Синее небо красивое!"
+      },
+      {
+        "type": "fill_blank",
+        "question": "Вставьте 'белый':",
+        "sentence": "___ nive kadu mane.",
+        "options": [
+          "Blanka",
+          "Ruba",
+          "Nigra"
+        ],
+        "correct_word": "Blanka",
+        "translation": "Белый снег падает утром",
+        "explanation": "'Blanka nive kadu.' = 'Белый снег падает.' — пример из словаря."
+      },
+      {
+        "type": "judge",
+        "question": "Оцените утверждение:",
+        "prompt": "Nigra",
+        "statement": "Это слово означает 'Чёрный'",
+        "is_true": true,
+        "explanation": "Верно! Nigra = чёрный, как 'Nigra nox' — чёрная ночь."
+      },
+      {
+        "type": "listen_tap",
+        "question": "Соберите услышанное:",
+        "prompt": "Ruba flora, blua aero",
+        "correct_sequence": [
+          "Ruba",
+          "flora,",
+          "blua",
+          "aero"
+        ],
+        "word_pool": [
+          "Ruba",
+          "flora,",
+          "blua",
+          "aero",
+          "panu",
+          "kasa",
+          "domi"
+        ],
+        "explanation": "'Ruba flora, blua aero' = 'Красный цветок, синее небо'."
+      }
+    ]
+  },
+  {
+    "id": 29,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 13: Что ты любишь? Вкусы и предпочтения",
+    "xp_reward": 25,
+    "order_num": 13,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Что означает глагол 'Voli'?",
+        "prompt": "Voli",
+        "options": [
+          "Хотеть / желать",
+          "Мочь / уметь",
+          "Должен",
+          "Бежать"
+        ],
+        "correct": 0,
+        "explanation": "'Voli' = хотеть, 'Poti' = мочь/уметь, 'Debe' = должен."
+      },
+      {
+        "type": "find_error",
+        "question": "Найдите ошибку в предложении:",
+        "sentence_words": [
+          "Me",
+          "voli",
+          "toro",
+          "kafo"
+        ],
+        "error_word": "toro",
+        "translation": "Я хочу кофе",
+        "explanation": "Два глагола подряд лишние. Правильно: 'Me voli kafo.' или 'Me toro kafo.'"
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите 'Я хочу пить чай':",
+        "prompt": "Я хочу пить чай",
+        "correct_sequence": [
+          "Me",
+          "voli",
+          "biba",
+          "teo!"
+        ],
+        "word_pool": [
+          "Me",
+          "voli",
+          "biba",
+          "teo!",
+          "kuri",
+          "silba",
+          "nox"
+        ],
+        "explanation": "Me voli biba teo! = Я хочу пить чай! (biba = пить)"
+      },
+      {
+        "type": "translate",
+        "question": "Переведите на русский:",
+        "prompt": "Me toro Vladikish tre!",
+        "correct_answers": [
+          "Я очень люблю Владикиш",
+          "Я очень люблю Владикиш!",
+          "Очень люблю Владикиш"
+        ],
+        "explanation": "'Toro' = любить, 'tre' = очень. Me toro ... tre!"
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Ответьте Сибе о предпочтениях:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Tu voli kafo o teo, amiko?",
+        "prompt_translation": "Ты хочешь кофе или чай, друг?",
+        "options": [
+          "Me voli teo, danko!",
+          "Me vivi in urbi.",
+          "Unde est domi?"
+        ],
+        "correct": 0,
+        "explanation": "'Me voli teo, danko!' = 'Я хочу чай, спасибо!'"
+      },
+      {
+        "type": "speak",
+        "question": "Произнесите фразу в микрофон:",
+        "prompt": "Me toro Vladikish e me voli poti lingo bone!",
+        "explanation": "Чётко произнесите: 'Me toro Vladikish e me voli poti lingo bone!' (Я люблю Владикиш и хочу уметь хорошо говорить!)"
+      }
+    ]
+  },
+  {
+    "id": 30,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 14: Еда, напитки и угощения",
+    "xp_reward": 25,
+    "order_num": 14,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Что означает 'Panu'?",
+        "prompt": "Panu",
+        "options": [
+          "Хлеб / выпечка",
+          "Вода",
+          "Чай",
+          "Книга"
+        ],
+        "correct": 0,
+        "explanation": "'Panu' = хлеб, 'Aqua' = вода, 'Teo/Teya' = чай, 'Kafo' = кофе."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите 'Свежий хлеб очень вкусный':",
+        "prompt": "Свежий хлеб очень вкусный",
+        "correct_sequence": [
+          "Panu",
+          "fresku",
+          "est",
+          "tre",
+          "bonu!"
+        ],
+        "word_pool": [
+          "Panu",
+          "fresku",
+          "est",
+          "tre",
+          "bonu!",
+          "nigra",
+          "silba"
+        ],
+        "explanation": "Panu fresku est tre bonu! — фраза из словаря."
+      },
+      {
+        "type": "match_pairs",
+        "question": "Сопоставьте еду и напитки:",
+        "pairs": [
+          {
+            "left": "Panu",
+            "right": "Хлеб"
+          },
+          {
+            "left": "Aqua",
+            "right": "Вода"
+          },
+          {
+            "left": "Teo",
+            "right": "Чай"
+          },
+          {
+            "left": "Kafo",
+            "right": "Кофе"
+          }
+        ],
+        "explanation": "Базовый набор угощений Vladikish."
+      },
+      {
+        "type": "fill_blank",
+        "question": "Вставьте 'вода':",
+        "sentence": "___ fresca de fluma est bona.",
+        "options": [
+          "Aqua",
+          "Panu",
+          "Libro"
+        ],
+        "correct_word": "Aqua",
+        "translation": "Свежая вода из реки хороша.",
+        "explanation": "'Aqua fresca de fluma' — пример из словаря."
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Примите угощение от Сибы:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Voli tu panu e teo, amiko?",
+        "prompt_translation": "Хочешь хлеба и чаю, друг?",
+        "options": [
+          "Si, dankoni! Me voli panu e teo.",
+          "Me vivi in urbi.",
+          "Kwis est tu?"
+        ],
+        "correct": 0,
+        "explanation": "'Si, dankoni! Me voli panu e teo.' = 'Да, большое спасибо! Я хочу хлеба и чаю.'"
+      },
+      {
+        "type": "listening_dictation",
+        "question": "Напишите услышанное слово:",
+        "prompt": "Kafo forti mane",
+        "explanation": "Kafo forti mane = Крепкий кофе утром. Напишите то, что услышали."
+      }
+    ]
+  },
+  {
+    "id": 31,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 15: Каждый день: время и дела",
+    "xp_reward": 25,
+    "order_num": 15,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Что означает 'Mane'?",
+        "prompt": "Mane",
+        "options": [
+          "Утро / на заре",
+          "Ночь",
+          "Вечер",
+          "Год"
+        ],
+        "correct": 0,
+        "explanation": "'Mane' = утро, 'Zora' = день/солнце, 'Nox' = ночь, 'Tempo' = время."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите 'Каждое утро я пью кофе':",
+        "prompt": "Каждое утро я пью кофе",
+        "correct_sequence": [
+          "Omni",
+          "mane",
+          "me",
+          "biba",
+          "kafo."
+        ],
+        "word_pool": [
+          "Omni",
+          "mane",
+          "me",
+          "biba",
+          "kafo.",
+          "libro",
+          "silba",
+          "nox"
+        ],
+        "explanation": "Omni mane = каждое утро, me biba kafo = я пью кофе."
+      },
+      {
+        "type": "fill_blank",
+        "question": "Вставьте 'время':",
+        "sentence": "___ por lerne Vladikish!",
+        "options": [
+          "Tempo",
+          "Panu",
+          "Aqua"
+        ],
+        "correct_word": "Tempo",
+        "translation": "Время учить Владикиш!",
+        "explanation": "'Tempo por lerne Vladikish!' — мотивационная фраза."
+      },
+      {
+        "type": "judge",
+        "question": "Оцените утверждение:",
+        "prompt": "Nox",
+        "statement": "Это слово означает 'День'",
+        "is_true": false,
+        "explanation": "Неверно! 'Nox' = ночь, 'Zora' = день."
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Пожелайте Сибе доброго дня:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Mane fresku! Kwo tu faci hodie?",
+        "prompt_translation": "Свежее утро! Что ты делаешь сегодня?",
+        "options": [
+          "Me labori e lerne Vladikish!",
+          "Me no koma.",
+          "Blanka nive."
+        ],
+        "correct": 0,
+        "explanation": "'Me labori e lerne Vladikish!' = 'Я работаю и учу Владикиш!'"
+      },
+      {
+        "type": "listen_tap",
+        "question": "Соберите услышанное:",
+        "prompt": "Tempo por lerne Vladikish",
+        "correct_sequence": [
+          "Tempo",
+          "por",
+          "lerne",
+          "Vladikish"
+        ],
+        "word_pool": [
+          "Tempo",
+          "por",
+          "lerne",
+          "Vladikish",
+          "panu",
+          "domi",
+          "urbi"
+        ],
+        "explanation": "'Tempo por lerne Vladikish' = 'Время учить Владикиш'."
+      }
+    ]
+  },
+  {
+    "id": 32,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 16: Помощь, просьбы и направления",
+    "xp_reward": 30,
+    "order_num": 16,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Как сказать 'Помоги мне!'?",
+        "prompt": "Помоги мне!",
+        "options": [
+          "Helpu me!",
+          "Kuri me!",
+          "Dormi me!",
+          "Labi me!"
+        ],
+        "correct": 0,
+        "explanation": "'Helpu me!' — повелительная форма от 'helpi' (помогать) с окончанием -u."
+      },
+      {
+        "type": "find_error",
+        "question": "Найдите ошибку в просьбе:",
+        "sentence_words": [
+          "Plaso,",
+          "helpus",
+          "me!"
+        ],
+        "error_word": "helpus",
+        "translation": "Пожалуйста, помоги мне!",
+        "explanation": "Ошибка 'helpus' — нужно 'helpu' (императив на -u)."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите 'Пожалуйста, помоги мне, друг!':",
+        "prompt": "Пожалуйста, помоги мне, друг!",
+        "correct_sequence": [
+          "Plaso,",
+          "helpu",
+          "me,",
+          "amiko!"
+        ],
+        "word_pool": [
+          "Plaso,",
+          "helpu",
+          "me,",
+          "amiko!",
+          "kuri",
+          "nox",
+          "panu"
+        ],
+        "explanation": "Plaso = пожалуйста, helpu = помоги (повелит.), me = мне, amiko = друг."
+      },
+      {
+        "type": "match_pairs",
+        "question": "Сопоставьте вежливые формулы:",
+        "pairs": [
+          {
+            "left": "Plaso, helpu me!",
+            "right": "Пожалуйста, помоги мне!"
+          },
+          {
+            "left": "Parda, me no sabi",
+            "right": "Прости, я не знаю"
+          },
+          {
+            "left": "Vale",
+            "right": "До свидания"
+          },
+          {
+            "left": "Danko!",
+            "right": "Спасибо!"
+          }
+        ],
+        "explanation": "Вежливость — сердце Vladikish."
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Попросите Сибу о помощи в городе:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Me poti helpu tu! Unde tu voli iri?",
+        "prompt_translation": "Я могу помочь тебе! Куда ты хочешь идти?",
+        "options": [
+          "Plaso, me voli iri a urbi.",
+          "Me koma panu.",
+          "Nox est bona."
+        ],
+        "correct": 0,
+        "explanation": "'Plaso, me voli iri a urbi.' = 'Пожалуйста, я хочу идти в город.'"
+      },
+      {
+        "type": "translate",
+        "question": "Переведите на русский:",
+        "prompt": "Parda, me ankora no kompreni ben.",
+        "correct_answers": [
+          "Прости, я ещё не очень понимаю",
+          "Извини, я ещё не хорошо понимаю",
+          "Прости, я ещё не понимаю хорошо"
+        ],
+        "explanation": "Parda = прости, ankora = ещё, no = не, kompreni = понимать, ben = хорошо."
+      }
+    ]
+  },
+  {
+    "id": 33,
+    "skill_id": 13,
+    "skill_title": "Знакомство и Приветствия",
+    "language_code": "vladikish",
+    "title": "Урок 17: Большая беседа — знакомство от А до Я",
+    "xp_reward": 30,
+    "order_num": 17,
+    "exercises": [
+      {
+        "type": "multiple_choice",
+        "question": "Выберите полный правильный перевод 'Приятно познакомиться!':",
+        "prompt": "Приятно познакомиться!",
+        "options": [
+          "Est plaso tiriso tu!",
+          "Me vivi in urbi.",
+          "Koma panu nun.",
+          "Nox est bona."
+        ],
+        "correct": 0,
+        "explanation": "'Est plaso tiriso tu!' = 'Приятно познакомиться с тобой!' (plaso=приятно, tiriso=встречать)."
+      },
+      {
+        "type": "word_bank",
+        "question": "Соберите итоговую фразу знакомства:",
+        "prompt": "Привет! Я твой новый друг, я живу в городе.",
+        "correct_sequence": [
+          "Mira!",
+          "Me",
+          "est",
+          "tua",
+          "novu",
+          "amiko,",
+          "me",
+          "vivi",
+          "in",
+          "urbi."
+        ],
+        "word_pool": [
+          "Mira!",
+          "Me",
+          "est",
+          "tua",
+          "novu",
+          "amiko,",
+          "me",
+          "vivi",
+          "in",
+          "urbi.",
+          "kuri",
+          "panu"
+        ],
+        "explanation": "Mira! Me est tua novu amiko, me vivi in urbi. = Привет! Я твой новый друг, я живу в городе."
+      },
+      {
+        "type": "dialogue_fill",
+        "question": "Завершите диалог с Сибой итоговой беседой:",
+        "speaker_name": "Сиба-сэнсэй",
+        "speaker_avatar": "🐕",
+        "prompt": "Mira, amiko! Komo sta tu? Unde tu veni e kwo tu voli?",
+        "prompt_translation": "Привет, друг! Как дела? Откуда ты и чего ты хочешь?",
+        "options": [
+          "Tre bone! Me veni de Urbi de Lumi e me voli lerne Vladikish!",
+          "Me koma panu.",
+          "Blanka nive kadu."
+        ],
+        "correct": 0,
+        "explanation": "'Tre bone! Me veni de Urbi de Lumi e me voli lerne Vladikish!' — идеальный ответ новичка."
+      },
+      {
+        "type": "match_pairs",
+        "question": "Сопоставьте итоги главы:",
+        "pairs": [
+          {
+            "left": "Komo sta tu?",
+            "right": "Как дела?"
+          },
+          {
+            "left": "Me toro mea familia",
+            "right": "Я люблю семью"
+          },
+          {
+            "left": "Me havi deka anis",
+            "right": "Мне 10 лет"
+          },
+          {
+            "left": "Plaso, helpu me!",
+            "right": "Пожалуйста, помоги!"
+          }
+        ],
+        "explanation": "Вы прошли всю базу знакомства Vladikish!"
+      },
+      {
+        "type": "fill_blank",
+        "question": "Вставьте глагол 'любить':",
+        "sentence": "Me ___ Vladikish e mea familia!",
+        "options": [
+          "toro",
+          "kuri",
+          "dormi"
+        ],
+        "correct_word": "toro",
+        "translation": "Я люблю Владикиш и свою семью!",
+        "explanation": "'Me toro Vladikish e mea familia!' — любовь к языку и близким."
+      },
+      {
+        "type": "judge",
+        "question": "Оцените финальное утверждение:",
+        "prompt": "An tu poti lingo Vladikish?",
+        "statement": "Это вопрос 'Можешь ли ты говорить на Владикише?'",
+        "is_true": true,
+        "explanation": "Верно! 'An' = частица вопроса ли, 'tu poti lingo Vladikish?' = 'ты можешь говорить на Владикише?'"
+      }
+    ]
+  }
+]

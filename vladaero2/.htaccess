@@ -1,0 +1,61 @@
+# ────────────────────────────────────────────────────────────
+# VladAero — Apache Rewrite Rules
+# ────────────────────────────────────────────────────────────
+
+DirectoryIndex index.php index.html
+
+# Fallback: route everything through index.php (works even without mod_rewrite)
+<IfModule !mod_rewrite.c>
+    FallbackResource index.php
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Force HTTPS (uncomment in production if needed)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # ─── Protect sensitive directories & files ───────────────────
+    RewriteRule ^(config|core|storage|database|install|cron)(/.*)?$ - [F,L]
+    RewriteRule \.(sql|log|env|lock|md)$ - [F,L]
+
+    # ─── Serve existing static files directly ────────────────────
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # ─── Serve existing subdirectories (except root) ────────────
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteCond %{REQUEST_URI} !^/?$
+    RewriteRule ^ - [L]
+
+    # ─── Install wizard & OG image proxy ─────────────────────────
+    RewriteRule ^install\.php$ install.php [L]
+    RewriteRule ^og/(.+)$ og.php?path=$1 [L,QSA]
+    RewriteRule ^telegram/webhook$ index.php [L,QSA]
+
+    # ─── All other requests → index.php ──────────────────────────
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.*)$ index.php [L,QSA]
+</IfModule>
+
+# ─── PHP Upload & Execution Limits ───────────────────────────
+<IfModule mod_php.c>
+    php_value upload_max_filesize 100M
+    php_value post_max_size 110M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
+
+# ─── Security Headers ──────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ─── Block directory listing & Server Signature ───────────────
+Options -Indexes
+ServerSignature Off
+

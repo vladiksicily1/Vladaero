@@ -1,0 +1,48 @@
+name: Build & Test
+
+on:
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish (win-x64 self-contained)
+        run: dotnet publish WinActivationPro/WinActivationPro.csproj -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Install FFmpeg
+        shell: pwsh
+        run: |
+          $url = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip'
+          Invoke-WebRequest $url -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg -Force
+          Get-ChildItem ffmpeg -Recurse -Filter ffmpeg.exe | Select-Object -First 1 -ExpandProperty FullName | Set-Content ffmpeg_path.txt
+
+      - name: Run automated test
+        shell: pwsh
+        run: |
+          $ffmpeg = Get-Content ffmpeg_path.txt
+          $exe = Join-Path $PWD 'publish\WINActivationPro.exe'
+          & ./.github/scripts/run-test.ps1 -Exe $exe -Ffmpeg $ffmpeg
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WINActivationPro-test
+          path: |
+            publish/
+            test-results/
+          if-no-files-found: error

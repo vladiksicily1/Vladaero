@@ -1,0 +1,507 @@
+/* ═══════════════════════════════════════════════════════════════
+   VladAero — Aviation UI
+   Glass Cockpit, HUD, Instrument Panel elements
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── AI Widget ─────────────────────────────────────────────── */
+.ai-widget {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 4000;
+}
+
+.ai-widget__trigger {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #2563eb);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px var(--accent-glow), 0 0 40px rgba(59,130,246,.15);
+    transition: all var(--transition);
+    position: relative;
+}
+.ai-widget__trigger:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 30px var(--accent-glow), 0 0 60px rgba(59,130,246,.2);
+}
+.ai-widget__icon { width: 28px; height: 28px; fill: currentColor; }
+
+/* Radar ring animation */
+.ai-widget__radar-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    animation: radarPulse 2s ease-out infinite;
+}
+@keyframes radarPulse {
+    0% { transform: scale(.8); opacity: .6; }
+    100% { transform: scale(1.6); opacity: 0; }
+}
+
+.ai-widget.open .ai-widget__trigger { display: none; }
+
+.ai-widget__panel {
+    display: none;
+    width: 400px;
+    max-width: calc(100vw - 2rem);
+    height: 520px;
+    max-height: calc(100vh - 8rem);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideUp .3s ease;
+}
+.ai-widget.open .ai-widget__panel { display: flex; }
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-widget__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .75rem 1rem;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+}
+.ai-widget__header-info {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-weight: 600;
+    font-size: .9rem;
+}
+.ai-widget__status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+}
+.ai-widget__header-actions { display: flex; gap: .25rem; }
+.ai-widget__minimize,
+.ai-widget__close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: .25rem .5rem;
+    border-radius: 4px;
+    font-size: .9rem;
+}
+.ai-widget__minimize:hover,
+.ai-widget__close:hover { color: var(--text); background: var(--surface); }
+
+.ai-widget__messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.ai-widget__welcome {
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-dim);
+    font-size: .9rem;
+    line-height: 1.5;
+}
+.ai-widget__welcome p { margin-bottom: .5rem; }
+
+.ai-widget__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    justify-content: center;
+    margin-top: .75rem;
+}
+.ai-chip {
+    padding: .4rem .8rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: .8rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: var(--font);
+}
+.ai-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Message bubbles */
+.ai-msg {
+    max-width: 85%;
+    padding: .65rem .9rem;
+    border-radius: var(--radius);
+    font-size: .85rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+.ai-msg--user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+.ai-msg--assistant {
+    align-self: flex-start;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+}
+.ai-msg--tool {
+    align-self: flex-start;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    padding: .5rem .75rem;
+}
+.ai-msg--assistant code {
+    background: var(--bg);
+    padding: .1rem .3rem;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: .8rem;
+}
+
+/* Aircraft card embedded in AI response */
+.ai-aircraft-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .75rem;
+    margin-top: .5rem;
+    display: flex;
+    gap: .75rem;
+}
+.ai-aircraft-card__img {
+    width: 120px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+.ai-aircraft-card__info { flex: 1; }
+.ai-aircraft-card__name { font-weight: 600; font-size: .9rem; margin-bottom: .25rem; }
+.ai-aircraft-card__specs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: .25rem;
+    font-size: .75rem;
+    color: var(--text-dim);
+}
+
+/* Typing indicator */
+.ai-typing {
+    display: flex;
+    gap: .3rem;
+    padding: .5rem .75rem;
+    align-self: flex-start;
+}
+.ai-typing__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    animation: typingBounce 1.2s ease-in-out infinite;
+}
+.ai-typing__dot:nth-child(2) { animation-delay: .2s; }
+.ai-typing__dot:nth-child(3) { animation-delay: .4s; }
+@keyframes typingBounce {
+    0%, 100% { transform: translateY(0); opacity: .4; }
+    50% { transform: translateY(-4px); opacity: 1; }
+}
+
+.ai-widget__input-area {
+    display: flex;
+    align-items: flex-end;
+    gap: .5rem;
+    padding: .75rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+}
+.ai-widget__input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .5rem .75rem;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: .85rem;
+    resize: none;
+    outline: none;
+    max-height: 100px;
+    transition: border-color var(--transition);
+}
+.ai-widget__input:focus { border-color: var(--accent); }
+.ai-widget__send {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--transition);
+}
+.ai-widget__send:hover { background: var(--accent-hover); }
+.ai-widget__send svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* ─── Compass / Heading Indicator ───────────────────────────── */
+.compass {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.compass__needle {
+    width: 2px;
+    height: 40px;
+    background: linear-gradient(var(--error) 50%, var(--accent) 50%);
+    position: absolute;
+    transform-origin: bottom center;
+    border-radius: 1px;
+}
+.compass__label {
+    position: absolute;
+    font-size: .65rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+}
+.compass__label--n { top: 4px; color: var(--error); }
+.compass__label--s { bottom: 4px; }
+.compass__label--e { right: 4px; }
+.compass__label--w { left: 4px; }
+
+/* ─── Altitude Tape ─────────────────────────────────────────── */
+.alt-tape {
+    width: 70px;
+    height: 300px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: .75rem;
+}
+.alt-tape__center {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 24px;
+    transform: translateY(-50%);
+    border-top: 1px solid var(--accent);
+    border-bottom: 1px solid var(--accent);
+    background: var(--accent-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: .8rem;
+}
+.alt-tape__marks {
+    position: absolute;
+    inset: 0;
+    padding: 0 .5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+/* ─── HUD Overlay Elements ──────────────────────────────────── */
+.hud-glow {
+    text-shadow: 0 0 10px var(--accent-glow);
+}
+
+.hud-border {
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: var(--radius);
+    background: rgba(10, 22, 40, 0.85);
+    backdrop-filter: blur(4px);
+}
+
+.hud-panel {
+    background: rgba(10, 22, 40, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+
+/* ─── Warning / Caution / Advisory strips ───────────────────── */
+.warning-strip {
+    padding: .5rem 1rem;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+.warning-strip--caution {
+    background: rgba(245, 158, 11, 0.15);
+    border-left: 3px solid var(--amber);
+    color: var(--amber);
+}
+.warning-strip--warning {
+    background: rgba(239, 68, 68, 0.15);
+    border-left: 3px solid var(--error);
+    color: var(--error);
+}
+.warning-strip--advisory {
+    background: rgba(6, 182, 212, 0.15);
+    border-left: 3px solid var(--info);
+    color: var(--info);
+}
+
+/* ─── Engine Sound Player ───────────────────────────────────── */
+.engine-player {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.engine-player__btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.engine-player__info { flex: 1; }
+.engine-player__name { font-size: .85rem; font-weight: 500; }
+.engine-player__type { font-size: .75rem; color: var(--text-dim); }
+.engine-player__wave {
+    height: 30px;
+    flex: 1;
+    max-width: 200px;
+    background: var(--bg);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ─── LiveATC Mini Player (header/footer) ───────────────────── */
+.liveatc-player {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .4rem .75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: .8rem;
+}
+.liveatc-player__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--error);
+    animation: blink 1s ease infinite;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+.liveatc-player__label { color: var(--text-dim); }
+.liveatc-player__play {
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: .1rem;
+}
+
+/* ─── Pulsing status indicators ─────────────────────────────── */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.status-dot--online { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-dot--offline { background: var(--text-muted); }
+.status-dot--alert { background: var(--error); animation: blink .8s ease infinite; }
+
+/* ─── Achievements / Badges ─────────────────────────────────── */
+.achievement {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all var(--transition);
+}
+.achievement:hover { border-color: var(--amber); }
+.achievement__icon { font-size: 1.5rem; }
+.achievement__name { font-weight: 600; font-size: .9rem; }
+.achievement__desc { font-size: .8rem; color: var(--text-dim); }
+.achievement--locked { opacity: .4; filter: grayscale(1); }
+
+/* ─── Rank Badge ────────────────────────────────────────────── */
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .25rem .6rem;
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600;
+    border: 1px solid;
+}
+.rank-badge--cadet { color: #94a3b8; border-color: #475569; background: rgba(71,85,105,.15); }
+.rank-badge--co-pilot { color: var(--info); border-color: rgba(6,182,212,.3); background: rgba(6,182,212,.1); }
+.rank-badge--captain { color: var(--accent); border-color: rgba(59,130,246,.3); background: rgba(59,130,246,.1); }
+.rank-badge--squadron { color: var(--amber); border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.1); }
+.rank-badge--commander { color: #a855f7; border-color: rgba(168,85,247,.3); background: rgba(168,85,247,.1); }
+.rank-badge--kvs { color: #f59e0b; border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.15); box-shadow: 0 0 8px rgba(245,158,11,.2); }
+
+/* ─── SVG Icons inline ──────────────────────────────────────── */
+.icon { width: 18px; height: 18px; fill: currentColor; vertical-align: middle; }
+.icon--sm { width: 14px; height: 14px; }
+.icon--lg { width: 24px; height: 24px; }
+
+/* ─── Smooth page transitions ───────────────────────────────── */
+.page-enter { animation: pageSlideIn .3s ease; }
+@keyframes pageSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "VladAero Aviation Portal",
+  "short_name": "VladAero",
+  "description": "Энциклопедия авиации, споттинг, радар полетов и бортовой ИИ",
+  "start_url": "index.php",
+  "display": "standalone",
+  "background_color": "#0b132b",
+  "theme_color": "#0b132b",
+  "icons": [
+    {
+      "src": "assets/images/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

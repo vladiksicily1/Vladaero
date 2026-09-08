@@ -1,0 +1,94 @@
+================================================================================
+                    🐕 SHIBALINGO MASTER PROMPTS VAULT 🐕
+           All AI Prompts: Mascot Graphics, AI Tutor, Conlang, Tools
+================================================================================
+Updated: 2026-08-29 (Expanded with Features 31-60)
+Project: ShibaLingo (Language Learning Platform with Shiba Inu Mascot & Vladikish)
+================================================================================
+
+--------------------------------------------------------------------------------
+SECTION 1: SHIBA INU MASCOT ART PROMPTS (Midjourney v6 / DALL-E 3 / SDXL)
+--------------------------------------------------------------------------------
+
+1.1 MAIN MASCOT - BASE 3D DUOLINGO / PIXAR STYLE
+Prompt:
+A cute, friendly Japanese Shiba Inu dog mascot named "Shiba-sensei", full body, wearing a tiny green graduation cap and a colorful scarf, cheerful big expressive anime eyes, warm happy smile, vibrant 3D stylized vector art in modern Duolingo / Pixar character style, bright cheerful lighting, clean solid pastel background, smooth clay render, isometric, 8k, high quality, trending on artstation --v 6.0 --ar 1:1
+
+1.2 MASCOT SKINS & EMOTIONAL STATES:
+
+A) 🎉 CELEBRATION / LESSON FINISHED:
+Prompt:
+Cute Shiba Inu dog wearing a shiny purple party hat with colorful falling confetti in the air, cheering enthusiastically with front paws raised up, big joyful open-mouth smile, sparkling eyes, Duolingo 3D character style, clean white background, soft drop shadow, 8k --v 6.0 --ar 1:1
+
+B) 🤓 PROFESSOR / GRAMMAR MASTER:
+Prompt:
+Cute Japanese Shiba Inu dog wearing round golden wireframe professor glasses and a smart little brown bow tie, holding a small wooden teaching pointer stick next to an open glowing ancient book, wise friendly look, clean vector 3D Pixar render, solid cyan background --v 6.0 --ar 1:1
+
+C) 💔 ENCOURAGING ON MISTAKE (SWEAT DROP):
+Prompt:
+Cute Shiba Inu dog looking slightly sad but encouraging, small blue sweat drop on forehead, soft droopy ears, gently waving one paw forward, warm sympathetic expression, "you can do it" vibe, soft pastel background, 3D Duolingo character art --v 6.0 --ar 1:1
+
+D) 💤 SLEEPING / MAINTENANCE MODE:
+Prompt:
+Cute Shiba Inu puppy sleeping peacefully curled up on a fluffy green cushion, wearing a tiny nightcap with a pompom, floating blue "Zzz" letters above, cozy calming night lighting, minimal clean 3D clay render --v 6.0 --ar 1:1
+
+E) ✈️ AVIATION PILOT SHIBA (AERO SKIN):
+Prompt:
+Cute Shiba Inu mascot dressed as a vintage airplane pilot, wearing classic leather aviator goggles on its head and a white silk flight scarf blowing in the wind, standing proud and adventurous, 3D Pixar stylized render, sky blue background --v 6.0 --ar 1:1
+
+F) ⚔️ SAMURAI SHIBA (JAPANESE SKIN):
+Prompt:
+Cute cartoon Shiba Inu dog dressed in traditional Japanese red and gold lightweight samurai armor, holding a wooden practice bamboo sword, heroic yet super cute, 3D Duolingo stylized render, clean studio lighting --v 6.0 --ar 1:1
+
+G) 🕶️ CYBERPUNK SHIBA (FUTURE SKIN):
+Prompt:
+Cute Shiba Inu wearing neon cyan glowing cyberpunk visor glasses and a high-tech futuristic holographic jacket, neon purple and teal backlight, super cute sci-fi pet, 3D stylized render --v 6.0 --ar 1:1
+
+H) 🧙‍♂️ WIZARD SHIBA (MAGIC SKIN):
+Prompt:
+Cute Shiba Inu wearing a starry blue wizard hat and a small cape, holding a miniature glowing magical wand in its paw with sparkling golden stars around, fantasy Pixar style, 3D render --v 6.0 --ar 1:1
+
+I) 🍖 TAMAGOTCHI PET SHIBA (HAPPY & EATING):
+Prompt:
+Cute chubby Shiba Inu puppy sitting happily on a wooden floor holding a golden bone and cookie, licking its lips, big sparkle eyes, kawaii anime 3D clay render, warm ambient lighting --v 6.0 --ar 1:1
+
+J) 👾 ERROR GOLEM BOSS RAID (RPG BOSS):
+Prompt:
+A giant cute stone golem covered in glowing purple glitch symbols and fragmented grammatical letters, comic boss monster in Duolingo style, epic but non-scary, fantasy video game concept art --v 6.0 --ar 1:1
+
+--------------------------------------------------------------------------------
+SECTION 2: NVIDIA NIM AI SYSTEM PROMPTS (build.nvidia.com)
+--------------------------------------------------------------------------------
+
+2.1 SHIBA-SENSEI CHAT TUTOR:
+System Prompt:
+You are 'Сиба-сэнсэй' (Shiba-sensei), a friendly, cute, encouraging Japanese Shiba Inu dog language tutor in the ShibaLingo app.
+You are chatting with a student in target language: '{LANG_CODE}'.
+Your tone is warm, enthusiastic, puppy-like (use occasional dog emotes like 'Гав! 🐾', 'Дай лапу!'), helpful, and motivating.
+
+2.2 AI MNEMONICS & VISUAL MEMORY GENERATOR:
+System Prompt:
+You are the Memory Master for language learning.
+Given a word in '{LANG_CODE}' and its translation, generate:
+1. A funny, memorable mnemonic association linking sound to meaning.
+2. A vivid mental picture description.
+3. A catchy rhyme.
+
+2.3 AI VISION OBJECT SCANNER & EXPLAINER (Llama 3.2 Vision):
+System Prompt:
+Analyze the uploaded image or scene.
+Identify the main object or action.
+Provide the word for this object in Vladikish, Russian, English, and Italian with phonetic pronunciation and an example sentence.
+
+2.4 AI MYTHS & PROVERBS OF VLADIKISH:
+System Prompt:
+You are the ancient Chronicler of the Vladikish civilization.
+Invent a philosophical proverb or short folk myth explaining natural phenomena (Sun Zora, Sky Aero, Night Nox) using official Vladikish grammar and vocabulary with Russian translation.
+
+2.5 AI HOMEWORK & EXAM GENERATOR (TEACHER PORTAL):
+System Prompt:
+Generate a comprehensive 5-question test covering recently studied vocabulary and grammar topics for classroom students with answer key and grading rubric.
+
+================================================================================
+                  END OF PROMPTS VAULT - EXTEND AS NEEDED
+================================================================================

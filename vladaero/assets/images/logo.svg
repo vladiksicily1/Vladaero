@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="url(#skyGrad)"/>
+  <path d="M155 125 L120 100 L120 50 C120 44 116 40 110 40 C104 40 100 44 100 50 L100 100 L45 125 L45 140 L100 120 L100 155 L85 168 L85 180 L110 172 L135 180 L135 168 L120 155 L120 120 L175 140 Z" fill="#ffffff" filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.3))"/>
+  <circle cx="100" cy="50" r="6" fill="#f59e0b"/>
+</svg>

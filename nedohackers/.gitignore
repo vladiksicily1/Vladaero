@@ -1,0 +1,12 @@
+# .NET
+bin/
+obj/
+publish/
+*.user
+
+# Test results
+test-results/
+
+# OS
+Thumbs.db
+.DS_Store

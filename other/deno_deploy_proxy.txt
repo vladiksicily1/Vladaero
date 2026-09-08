@@ -1,0 +1,65 @@
+================================================================================
+DENO DEPLOY — БЕСПЛАТНЫЙ РЕВЕРС-ПРОКСИ ДЛЯ NVIDIA NIM (БЕЗ ТАЙМАУТОВ)
+================================================================================
+
+100% бесплатно, вход через GitHub, без привязки карт и телефона.
+Поддерживает 100 000 запросов в день и потоковый вывод без обрывов.
+
+================================================================================
+КОД ДЛЯ ВСТАВКИ В DENO DEPLOY PLAYGROUND:
+================================================================================
+
+Deno.serve(async (req) => {
+  // Обработка CORS preflight запросов
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+      },
+    });
+  }
+
+  const url = new URL(req.url);
+  const target = new URL(url.pathname + url.search, "https://integrate.api.nvidia.com");
+
+  // Переносим заголовки клиента и заменяем Host
+  const headers = new Headers(req.headers);
+  headers.set("Host", "integrate.api.nvidia.com");
+
+  // Проксируем запрос в NVIDIA NIM
+  const response = await fetch(target, {
+    method: req.method,
+    headers: headers,
+    body: req.method !== "GET" && req.method !== "HEAD" ? req.body : null,
+    redirect: "follow",
+  });
+
+  // Добавляем CORS заголовки к ответу
+  const respHeaders = new Headers(response.headers);
+  respHeaders.set("Access-Control-Allow-Origin", "*");
+  respHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  respHeaders.set("Access-Control-Allow-Headers", "*");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: respHeaders,
+  });
+});
+
+
+================================================================================
+ИНСТРУКЦИЯ ПО ЗАПУСКУ (1 МИНУТА):
+================================================================================
+1. Перейдите на сайт: https://deno.com/deploy
+2. Нажмите "Sign in with GitHub" (вход через ваш GitHub-аккаунт).
+3. Нажмите кнопку "New Project" -> выберите "Playground" (или "Blank").
+4. Удалите стандартный код и вставьте код из блока выше.
+5. Нажмите синюю кнопку "Save & Deploy" в правом верхнем углу.
+6. Скопируйте адрес вашего проекта (например: https://my-nvidia-proxy.deno.dev).
+7. В админке ShibaLingo (admin/ai_prompts.php) укажите:
+   Custom API Base URL: https://my-nvidia-proxy.deno.dev/v1
+================================================================================

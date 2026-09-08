@@ -1,0 +1,31 @@
+# ===================================================
+# VladInc Ecosystem (.htaccess)
+# Designed for Shared Hosting (Apache / LiteSpeed)
+# ===================================================
+
+Options -Indexes +FollowSymLinks
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # 1. DO NOT TOUCH OR INTERCEPT existing folders 'mama' and 'shibalingo'
+    RewriteCond %{REQUEST_URI} ^/(mama|shibalingo)(/.*)?$ [NC]
+    RewriteRule ^ - [L]
+
+    # 2. Allow direct access to existing files and directories (assets, uploads, etc.)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 3. Route all other requests to the ecosystem front-controller
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Security headers & compression
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>

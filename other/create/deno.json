@@ -1,0 +1,22 @@
+{
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
+  "name": "nvidia-nim-proxy",
+  "version": "1.0.0",
+  "exports": "./proxy.js",
+  "tasks": {
+    "start": "deno run --allow-net --allow-env proxy.js",
+    "dev": "deno run --watch --allow-net --allow-env proxy.js",
+    "deploy": "deno run -A jsr:@deno/deployctl deploy proxy.js"
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "singleQuote": false
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  }
+}

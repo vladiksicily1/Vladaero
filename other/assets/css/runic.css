@@ -1,0 +1,15 @@
+/* Runic / Ancient Font Styles for Vladikish */
+
+.runic-text {
+    font-family: 'Cinzel Decorative', 'Georgia', serif;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #b45309;
+}
+
+[data-font="runic"] .prompt-text,
+[data-font="runic"] .question-title,
+[data-font="runic"] .dict-row td:first-child {
+    font-family: 'Cinzel Decorative', 'Georgia', serif;
+    letter-spacing: 1.5px;
+}
