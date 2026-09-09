@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+    "ntdll",
+    "kernel32",
+    "user32",
+    "gdi32",
+    "cmd",
+    "system/vladss",
+    "system/wininit",
+    "system/winlogon",
+    "system/services",
+    "system/csrss",
+    "system/lsass",
+]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true

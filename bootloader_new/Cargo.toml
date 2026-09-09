@@ -1,0 +1,26 @@
+[package]
+name = "vladboot"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "vladboot"
+path = "src/lib.rs"
+crate-type = ["lib"]
+
+[[bin]]
+name = "uefi_entry"
+path = "src/bin/uefi_entry.rs"
+
+[[bin]]
+name = "bios_entry"
+path = "src/bin/bios_entry.rs"
+
+[profile.dev]
+panic = "abort"
+opt-level = 0
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true

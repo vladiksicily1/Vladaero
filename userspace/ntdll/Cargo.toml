@@ -1,0 +1,19 @@
+[package]
+name = "ntdll"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "ntdll"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+linked_list_allocator = { version = "0.10", default-features = false, features = ["alloc_ref", "use_spin"] }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true

@@ -1,0 +1,16 @@
+[package]
+name = "wininit"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wininit"
+path = "src/main.rs"
+
+[dependencies]
+ntdll = { path = "../../ntdll" }
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true

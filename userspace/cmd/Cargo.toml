@@ -1,0 +1,19 @@
+[package]
+name = "cmd"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "cmd"
+path = "src/main.rs"
+
+[dependencies]
+ntdll = { path = "../ntdll" }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
