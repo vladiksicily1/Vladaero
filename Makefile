@@ -14,15 +14,12 @@ DESTDIR?=./sysroot
 
 ifeq ($(ARCH),riscv64gc)
 	override ARCH:=riscv64
-	GNU_TARGET=riscv64-unknown-redox
 else ifeq ($(ARCH),i686)
 	override ARCH:=i586
-	GNU_TARGET=i686-unknown-redox
-else
-	GNU_TARGET=$(ARCH)-unknown-redox
 endif
 
-OBJCOPY?=$(GNU_TARGET)-objcopy
+# Use LLVM tools instead of Redox-specific ones
+OBJCOPY?=$(shell which llvm-objcopy 2>/dev/null || which objcopy 2>/dev/null || echo objcopy)
 
 all: $(BUILD)/kernel $(BUILD)/kernel.sym
 
@@ -38,7 +35,7 @@ $(BUILD):
 
 $(BUILD)/kernel.all: $(LD_SCRIPT) $(LOCKFILE) $(MANIFEST) $(TARGET_SPEC) $(shell find $(SOURCE) -name "*.rs" -type f) | $(BUILD)
 	cargo rustc \
-		--bin kernel \
+		--lib \
 		--manifest-path "$(MANIFEST)" \
 		--target "$(TARGET_SPEC)" \
 		--release \
@@ -66,7 +63,7 @@ KERNEL_CHECK_FEATURES?=
 
 check:
 	cargo check \
-		--bin kernel \
+		--lib \
 		--manifest-path "$(MANIFEST)" \
 		--target "$(TARGET_SPEC)" \
 		-Z build-std=core,alloc -Zbuild-std-features=compiler-builtins-mem \

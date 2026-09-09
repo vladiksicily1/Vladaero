@@ -1272,7 +1272,11 @@ impl ContextHandle {
                             Status::Dead { .. } => return Err(Error::new(EOWNERDEAD)),
                             Status::HardBlocked {
                                 reason: HardBlockedReason::AwaitingMmap { .. },
-                            } => todo!(),
+                            } => {
+                                // Context is waiting for mmap to complete.
+                                // We cannot stop it until the mmap completes.
+                                return Err(Error::new(EBUSY));
+                            },
                             _ => (),
                         }
                         guard.status = Status::HardBlocked {

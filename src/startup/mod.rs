@@ -171,6 +171,9 @@ pub(crate) fn kmain(bootstrap: Bootstrap) -> ! {
     //Initialize global schemes, such as `acpi:`.
     scheme::init_globals();
 
+    //Initialize NT syscall table
+    crate::nt::syscalls::nt_syscall_init();
+
     debug!("BSP: {} CPUs", crate::cpu_count());
     debug!("Env: {:?}", ::core::str::from_utf8(bootstrap.env));
 

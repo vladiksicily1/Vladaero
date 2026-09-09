@@ -1389,9 +1389,21 @@ pub fn page_fault_handler(
         let mut token = unsafe { CleanLockToken::new() };
         match context::memory::try_correcting_page_tables(faulting_page, mode, &mut token) {
             Ok(()) => return Ok(()),
-            Err(PfError::Oom) => todo!("oom"),
+            Err(PfError::Oom) => {
+                // Out of memory during page table correction.
+                // Try to trim working sets and retry once.
+                crate::mm::ws::mm_ws_trim();
+                match context::memory::try_correcting_page_tables(faulting_page, mode, &mut token) {
+                    Ok(()) => return Ok(()),
+                    _ => (),
+                }
+            },
             Err(PfError::Segv | PfError::RecursionLimitExceeded) => (),
-            Err(PfError::NonfatalInternalError) => todo!(),
+            Err(PfError::NonfatalInternalError) => {
+                // Non-fatal internal error (e.g., transient allocation failure).
+                // Log and continue with default handling.
+                crate::kernel_log!("[Mm] Page fault: non-fatal internal error at {:#x}", faulting_page);
+            },
         }
     }
 

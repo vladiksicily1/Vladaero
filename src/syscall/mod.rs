@@ -230,6 +230,14 @@ pub fn syscall(
 
             SYS_MPROTECT => mprotect(b, c, MapFlags::from_bits_truncate(d), token).map(|()| 0),
             SYS_MREMAP => mremap(b, c, d, e, f, token),
+
+            // NT-style syscalls (0x1000+)
+            a if a >= crate::nt::syscalls::NT_SYSCALL_BASE && a < crate::nt::syscalls::NT_SYSCALL_BASE + crate::nt::syscalls::NT_SYSCALL_COUNT => {
+                let status = unsafe {
+                    crate::nt::syscalls::nt_syscall_dispatch(a, b, c, d, e, f, g)
+                };
+                Ok(status as usize)
+            }
             _ => Err(Error::new(ENOSYS)),
         }
     }
