@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VladOS</title>
+<meta name="description" content="A from-scratch, futuristic desktop OS. Download the latest boot image.">
+<style>
+  :root{
+    --bg:#07090f;
+    --fg:#e8ecf4;
+    --muted:#8a93a6;
+    --accent:#3b82f6;
+    --accent-2:#8b5cf6;
+    --card:rgba(255,255,255,.045);
+    --card-border:rgba(255,255,255,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--fg);
+    background:var(--bg);
+    display:grid;
+    place-items:center;
+    padding:32px 20px;
+    overflow-x:hidden;
+  }
+  /* ambient gradient field */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:-30vmax;
+    z-index:-1;
+    background:
+      radial-gradient(38vmax 38vmax at 22% 18%, rgba(59,130,246,.28), transparent 60%),
+      radial-gradient(42vmax 42vmax at 82% 28%, rgba(139,92,246,.22), transparent 60%),
+      radial-gradient(50vmax 50vmax at 50% 108%, rgba(37,99,235,.20), transparent 60%);
+    filter:blur(28px) saturate(140%);
+    animation:drift 22s ease-in-out infinite alternate;
+  }
+  @keyframes drift{
+    from{transform:translate3d(-2%,-1%,0) scale(1)}
+    to{transform:translate3d(3%,2%,0) scale(1.08)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    body::before{animation:none}
+  }
+
+  .card{
+    width:min(560px,100%);
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:28px;
+    padding:48px 40px 40px;
+    text-align:center;
+    backdrop-filter:blur(24px) saturate(160%);
+    -webkit-backdrop-filter:blur(24px) saturate(160%);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.06) inset,
+      0 40px 80px -20px rgba(0,0,0,.6),
+      0 0 0 1px rgba(0,0,0,.2);
+  }
+
+  .mark{
+    width:64px;height:64px;
+    margin:0 auto 22px;
+    border-radius:18px;
+    display:grid;place-items:center;
+    background:linear-gradient(150deg,var(--accent),var(--accent-2));
+    box-shadow:0 12px 30px -8px rgba(59,130,246,.6);
+    font-weight:700;font-size:28px;letter-spacing:.5px;color:#fff;
+  }
+
+  h1{
+    font-size:34px;
+    letter-spacing:-.02em;
+    font-weight:650;
+    margin-bottom:8px;
+  }
+  .tagline{color:var(--muted);font-size:15px;margin-bottom:34px}
+
+  .download{
+    display:inline-flex;align-items:center;gap:12px;
+    padding:16px 30px;
+    border-radius:16px;
+    font-size:16px;font-weight:600;
+    color:#fff;text-decoration:none;
+    background:linear-gradient(150deg,var(--accent),var(--accent-2));
+    box-shadow:0 14px 34px -10px rgba(59,130,246,.7);
+    transition:transform .18s cubic-bezier(.2,.7,.2,1),box-shadow .18s;
+  }
+  .download:hover{transform:translateY(-2px);box-shadow:0 20px 44px -12px rgba(59,130,246,.85)}
+  .download:active{transform:translateY(0) scale(.985)}
+  .download svg{width:20px;height:20px}
+
+  .meta{
+    margin-top:22px;
+    font-size:13px;
+    color:var(--muted);
+    display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;
+  }
+  .meta code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    color:#aeb8cc;
+  }
+
+  .hint{
+    margin-top:30px;
+    padding-top:22px;
+    border-top:1px solid var(--card-border);
+    font-size:13px;color:var(--muted);
+  }
+  .hint b{color:var(--fg);font-weight:600}
+  a.plain{color:#9db4e8;text-decoration:none}
+  a.plain:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">V</div>
+    <h1>VladOS</h1>
+    <p class="tagline">A from-scratch, futuristic desktop OS — hybrid kernel, own <code>.vex</code>/<code>.vll</code> modules, AI in the system core.</p>
+
+    <a class="download" href="https://github.com/vladiksicily1/Vladaero/releases/download/nightly/vlados.iso" download>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M5 21h14"/>
+      </svg>
+      Download boot image (.iso)
+    </a>
+
+    <div class="meta">
+      <span>build <code>2026-09-10T17:43:39Z</code></span>
+      <span>commit <code>ddf0af8</code></span>
+      <span>x86_64 · UEFI</span>
+    </div>
+
+    <p class="hint">
+      Boot in <b>QEMU</b> or <b>UTM&nbsp;SE</b> (iPad). Attach the ISO as a CD-ROM with a
+      UEFI (OVMF) firmware. Source &amp; roadmap on
+      <a class="plain" href="https://github.com/vladiksicily1/Vladaero">GitHub</a>.
+    </p>
+  </main>
+</body>
+</html>
